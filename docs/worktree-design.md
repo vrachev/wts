@@ -152,13 +152,11 @@ metadata:
 ```
 wts/
 ├── pyproject.toml              # Modern Python packaging
-├── pytest.ini                  # Pytest configuration
 ├── .pre-commit-config.yaml     # Pre-commit hooks
 ├── AGENTS.md                   # Python coding guidelines for agents
 ├── README.md                   # User documentation
-├──  docs/
-│   ├── architecture.md         # This file
-│   └── commands.md             # Command reference
+├── docs/
+│   └── worktree-design.md      # This file
 │
 ├── src/wts/
 │   ├── __init__.py
@@ -170,8 +168,8 @@ wts/
 │   │   ├── create.py           # wts create
 │   │   ├── delete.py           # wts delete
 │   │   ├── list.py             # wts list
-│   │   ├── status.py           # wts status (set/get worktree status)
-│   │   └── doctor.py           # wts doctor (diagnose and fix issues)
+│   │   ├── status.py           # wts status (Phase 2)
+│   │   └── doctor.py           # wts doctor (Phase 2)
 │   │
 │   ├── core/                   # Business logic (no CLI deps)
 │   │   ├── __init__.py
@@ -179,13 +177,13 @@ wts/
 │   │   ├── worktree.py         # Worktree operations
 │   │   ├── paths.py            # Path resolution/validation
 │   │   ├── config.py           # Configuration management
-│   │   └── status.py           # Status tracking (NEW)
+│   │   └── status.py           # Status tracking (Phase 2)
 │   │
 │   ├── models/                 # Data classes
 │   │   ├── __init__.py
 │   │   ├── worktree.py         # Worktree model
 │   │   ├── config.py           # Config model
-│   │   └── status.py           # WorkStatus enum/model (NEW)
+│   │   └── status.py           # WorkStatus enum/model (Phase 2)
 │   │
 │   ├── exceptions.py           # Custom exceptions
 │   └── constants.py            # Constants
@@ -193,23 +191,22 @@ wts/
 └── tests/
     ├── __init__.py
     ├── conftest.py             # Pytest fixtures (temp repos, etc.)
-    ├── test_create_e2e.py      # E2E: create command
-    ├── test_delete_e2e.py      # E2E: delete command
-    ├── test_list_e2e.py        # E2E: list command
-    ├── test_status_e2e.py      # E2E: status tracking (NEW)
-    └── test_doctor_e2e.py      # E2E: doctor command (NEW)
+    ├── test_create_e2e.py      # E2E: create command (Phase 1)
+    ├── test_delete_e2e.py      # E2E: delete command (Phase 1)
+    ├── test_list_e2e.py        # E2E: list command (Phase 1)
+    ├── test_status_e2e.py      # E2E: status tracking (Phase 2)
+    └── test_doctor_e2e.py      # E2E: doctor command (Phase 2)
 ```
 
 ## Core Commands
 
-### MVP Commands (Phase 1)
+### Phase 1 Commands (Core)
 
 ```bash
 # Create worktree
 wts create <name> [options]
   --base-branch <branch>    # Base branch (default: main)
   --no-fetch                # Skip fetching
-  --description <text>      # Work description for status tracking
 
 # Delete worktree
 wts delete <name> [options]
@@ -219,9 +216,12 @@ wts delete <name> [options]
 # List worktrees
 wts list [options]
   --verbose                 # Show full details
-  --status <status>         # Filter by status (e.g., ready_for_review)
   --json                    # JSON output
+```
 
+### Phase 2 Commands (Status & Doctor)
+
+```bash
 # Status management
 wts status <name> <status>  # Set worktree status
 wts status <name>           # Get current status
@@ -230,9 +230,17 @@ wts status <name>           # Get current status
 wts doctor [options]
   --fix                     # Automatically fix issues
   --dry-run                 # Show what would be fixed
+
+# Enhanced list (adds --status filter)
+wts list [options]
+  --status <status>         # Filter by status (e.g., ready_for_review)
+
+# Enhanced create (adds --description)
+wts create <name> [options]
+  --description <text>      # Work description for status tracking
 ```
 
-### Phase 2 Commands (Claude Integration)
+### Phase 3 Commands (Claude Integration)
 
 ```bash
 # Complete work
@@ -351,47 +359,76 @@ Worktrees ready for review:
 
 ## Implementation Phases
 
-### Phase 1: MVP (Core + Status Tracking)
+### Phase 1: Core Commands
 
-**Goal**: Basic worktree management with status tracking
+**Goal**: Basic worktree management (create/delete/list)
 
 **Features**:
-1. Create/delete/list worktrees
-2. Status tracking (set/get status)
-3. File-based notifications (`.ready-for-review` markers)
-4. Doctor mode for repairs
-5. E2E tests for all commands
+1. Create worktrees with automatic branch creation
+2. Delete worktrees (with branch cleanup options)
+3. List worktrees with basic info
+4. E2E tests for all commands (TDD approach)
 
 **Files to Create**:
 1. Project structure (dirs, pyproject.toml)
 2. AGENTS.md (Python guidelines)
-3. Pre-commit hooks
-4. `src/wts/models/status.py` - WorkStatus enum
-5. `src/wts/core/status.py` - StatusManager
+3. Pre-commit hooks (.pre-commit-config.yaml)
+4. `src/wts/models/worktree.py` - Worktree model
+5. `src/wts/models/config.py` - Config model
 6. `src/wts/core/git.py` - GitRepo
 7. `src/wts/core/paths.py` - PathResolver
 8. `src/wts/core/worktree.py` - WorktreeManager
-9. `src/wts/core/config.py` - Config
+9. `src/wts/core/config.py` - Config loader
 10. `src/wts/cli/main.py` - CLI entry point
 11. `src/wts/cli/create.py` - Create command
 12. `src/wts/cli/delete.py` - Delete command
 13. `src/wts/cli/list.py` - List command
-14. `src/wts/cli/status.py` - Status command
-15. `src/wts/cli/doctor.py` - Doctor command
-16. `tests/test_create_e2e.py` - E2E test for create
-17. `tests/test_delete_e2e.py` - E2E test for delete
-18. `tests/test_list_e2e.py` - E2E test for list
-19. `tests/test_status_e2e.py` - E2E test for status
-20. `tests/test_doctor_e2e.py` - E2E test for doctor
+14. `src/wts/exceptions.py` - Custom exceptions
+15. `src/wts/constants.py` - Constants
+16. `tests/conftest.py` - Pytest fixtures
+17. `tests/test_create_e2e.py` - E2E test for create
+18. `tests/test_delete_e2e.py` - E2E test for delete
+19. `tests/test_list_e2e.py` - E2E test for list
 
 **Success Criteria**:
-- Create/delete/list worktrees work end-to-end
-- Status tracking functional
-- Notifications work (file markers created)
-- Doctor mode fixes common issues
+- `wts create <name>` creates worktree at correct path
+- `wts delete <name>` removes worktree and optionally branch
+- `wts list` shows all worktrees with basic info
+- All E2E tests pass
+- Pre-commit hooks pass (black, ruff, mypy)
+
+### Phase 2: Status Tracking & Doctor Mode
+
+**Goal**: Add status tracking, notifications, and repair functionality
+
+**Features**:
+1. Status tracking (set/get status via `.wts-status` files)
+2. File-based notifications (`.ready-for-review` markers)
+3. Doctor mode for diagnosing and fixing issues
+4. Enhanced list command with status filtering
+5. E2E tests for all new functionality
+
+**Files to Create/Modify**:
+1. `src/wts/models/status.py` - WorkStatus enum and StatusInfo model
+2. `src/wts/core/status.py` - StatusManager
+3. `src/wts/cli/status.py` - Status command
+4. `src/wts/cli/doctor.py` - Doctor command
+5. Modify `src/wts/cli/create.py` - Add `--description` option
+6. Modify `src/wts/cli/list.py` - Add `--status` filter
+7. Modify `src/wts/core/worktree.py` - Integrate StatusManager
+8. `tests/test_status_e2e.py` - E2E test for status
+9. `tests/test_doctor_e2e.py` - E2E test for doctor
+
+**Success Criteria**:
+- `wts status <name> <status>` sets worktree status
+- `wts status <name>` displays current status
+- `wts status <name> ready_for_review` creates `.ready-for-review` marker
+- `wts list --status ready_for_review` filters by status
+- `wts doctor` identifies orphaned worktrees/directories
+- `wts doctor --fix` repairs issues
 - All E2E tests pass
 
-### Phase 2: Claude Integration
+### Phase 3: Claude Integration
 
 **Goal**: Deep integration with Claude Code workflows
 
@@ -403,6 +440,13 @@ Worktrees ready for review:
 5. Run Claude in worktree (`wts <name> claude`)
 6. Headless Claude support
 7. Auto-PR creation when status=ready_for_review
+
+**Files to Create/Modify**:
+1. `src/wts/core/claude.py` - Claude settings management
+2. `src/wts/cli/complete.py` - Complete command
+3. Modify `src/wts/cli/create.py` - Add `--allow-auto-commit`
+4. `tests/test_complete_e2e.py` - E2E test for complete
+5. `tests/test_claude_e2e.py` - E2E test for Claude integration
 
 **Claude Settings Management**:
 ```bash
@@ -435,7 +479,12 @@ Marking feature-auth as complete...
 (Worktree kept, no PR created)
 ```
 
-### Phase 3: Advanced Features
+**Success Criteria**:
+- Claude settings properly copied to worktrees
+- `wts complete` handles merge/PR workflows
+- All E2E tests pass
+
+### Phase 4: Advanced Features
 
 **Goal**: Power user features and automation
 
@@ -447,6 +496,11 @@ Marking feature-auth as complete...
 5. `--json` output for all commands
 6. File watching for real-time notifications
 7. TUI prototype
+
+**Success Criteria**:
+- Shell integration works across bash/zsh/fish
+- Tab completion for commands and worktree names
+- All E2E tests pass
 
 ## Testing Strategy (TDD Approach)
 
@@ -755,53 +809,32 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 ```
 
-## Initial Setup Checklist
+## Initial Setup Checklist (Phase 1)
 
-**First pass - Repository Structure**:
+**Repository Structure** (already done):
 
-- [ ] Create directory structure
-- [ ] Create `pyproject.toml` with dependencies
-- [ ] Create `pytest.ini`
-- [ ] Create `AGENTS.md` with Python guidelines
-- [ ] Create `README.md` with basic usage
-- [ ] Create `.pre-commit-config.yaml`:
-  ```yaml
-  repos:
-    - repo: https://github.com/psf/black
-      rev: 23.12.0
-      hooks:
-        - id: black
-    - repo: https://github.com/charliermarsh/ruff-pre-commit
-      rev: v0.1.8
-      hooks:
-        - id: ruff
-    - repo: https://github.com/pre-commit/mirrors-mypy
-      rev: v1.7.0
-      hooks:
-        - id: mypy
-          additional_dependencies: [types-PyYAML]
-  ```
-- [ ] Create `.gitignore`:
-  ```
-  __pycache__/
-  *.pyc
-  .pytest_cache/
-  .mypy_cache/
-  .ruff_cache/
-  dist/
-  build/
-  *.egg-info/
-  .venv/
-  venv/
-  ```
-- [ ] Initialize git and create initial commit
-- [ ] Install pre-commit hooks: `pre-commit install`
+- [x] Create directory structure
+- [x] Create `pyproject.toml` with dependencies
+- [x] Create `AGENTS.md` with Python guidelines
+- [x] Create `README.md` with basic usage
+- [x] Create `.pre-commit-config.yaml`
+- [x] Create `.gitignore`
+
+**Phase 1 Implementation** (TDD approach):
+
+- [ ] Write E2E test for `wts create` command
+- [ ] Implement create command to pass test
+- [ ] Write E2E test for `wts delete` command
+- [ ] Implement delete command to pass test
+- [ ] Write E2E test for `wts list` command
+- [ ] Implement list command to pass test
+- [ ] Verify all E2E tests pass
+- [ ] Verify pre-commit hooks pass (black, ruff, mypy)
 
 ## Next Steps
 
-1. Complete initial repository setup
-2. Write first E2E test for `wts create`
-3. Implement create command to pass test (TDD)
-4. Repeat for other commands
-5. Get MVP working end-to-end
-6. User testing and iteration
+1. Begin Phase 1 with TDD - write `test_create_e2e.py` first
+2. Implement core modules (git.py, paths.py, worktree.py) to pass tests
+3. Continue with delete and list commands
+4. Complete Phase 1 with all E2E tests passing
+5. Move to Phase 2 (status tracking)

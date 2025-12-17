@@ -20,10 +20,7 @@ def tmp_git_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "test-repo"
     repo.mkdir()
 
-    # Initialize git repository
     subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
-
-    # Configure git user (required for commits)
     subprocess.run(
         ["git", "config", "user.email", "test@example.com"],
         cwd=repo,
@@ -37,7 +34,6 @@ def tmp_git_repo(tmp_path: Path) -> Path:
         capture_output=True,
     )
 
-    # Create initial commit on main branch
     readme = repo / "README.md"
     readme.write_text("# Test Repository\n")
     subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
@@ -54,10 +50,7 @@ def tmp_git_repo(tmp_path: Path) -> Path:
 @pytest.fixture
 def cli_runner(tmp_git_repo: Path, worktree_base_path: Path, monkeypatch: pytest.MonkeyPatch):
     """CLI runner configured for test repository."""
-    # CLI detects repo from current working directory
     monkeypatch.chdir(tmp_git_repo)
-
-    # Set worktree base path via environment variable
     monkeypatch.setenv("WTS_WORKTREE_BASE", str(worktree_base_path))
 
     class WtsCliRunner:

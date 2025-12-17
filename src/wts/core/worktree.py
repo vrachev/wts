@@ -79,7 +79,6 @@ class WorktreeManager:
         if worktree_path.exists():
             return True
 
-        # Also check git worktree list
         result = subprocess.run(
             ["git", "worktree", "list", "--porcelain"],
             cwd=self.repo_path,
@@ -111,17 +110,13 @@ class WorktreeManager:
             raise WorktreeExistsError(f"Branch '{name}' already exists")
 
         worktree_path = self._get_worktree_path(name)
-
-        # Ensure parent directory exists
         worktree_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Determine the base branch/commit
         if from_current:
             base_ref = "HEAD"
         else:
             base_ref = "main"
 
-        # Create the worktree with a new branch
         subprocess.run(
             ["git", "worktree", "add", "-b", name, str(worktree_path), base_ref],
             cwd=self.repo_path,

@@ -14,5 +14,4 @@ def cli() -> None:
     pass
 
 
-# Register commands
 cli.add_command(create)

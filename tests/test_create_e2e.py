@@ -48,26 +48,26 @@ def test_create_worktree_basic(
 
 
 @pytest.mark.e2e
-def test_create_worktree_with_base_branch(
+def test_create_worktree_from_current_branch(
     tmp_git_repo: Path,
     cli_runner,
     worktree_base_path: Path,
 ) -> None:
-    """Test creating a worktree from a specific base branch."""
-    # Given: A git repository with a develop branch
+    """Test creating a worktree from current branch using --from-current flag."""
+    # Given: A git repository where we're on a feature branch (not main)
     subprocess.run(
-        ["git", "checkout", "-b", "develop"],
+        ["git", "checkout", "-b", "feature-base"],
         cwd=tmp_git_repo,
         check=True,
         capture_output=True,
     )
-    # Add a commit to develop so it differs from main
-    (tmp_git_repo / "develop.txt").write_text("develop content")
+    # Add a commit so feature-base differs from main
+    (tmp_git_repo / "feature-base.txt").write_text("feature base content")
     subprocess.run(["git", "add", "."], cwd=tmp_git_repo, check=True)
-    subprocess.run(["git", "commit", "-m", "develop commit"], cwd=tmp_git_repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "feature base commit"], cwd=tmp_git_repo, check=True, capture_output=True)
 
-    # Get the develop branch commit
-    develop_commit = subprocess.run(
+    # Get the current branch commit
+    current_commit = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=tmp_git_repo,
         capture_output=True,
@@ -75,18 +75,15 @@ def test_create_worktree_with_base_branch(
         check=True,
     ).stdout.strip()
 
-    # Switch back to main
-    subprocess.run(["git", "checkout", "main"], cwd=tmp_git_repo, check=True, capture_output=True)
-
-    # When: Creating a worktree based on develop
-    result = cli_runner.invoke(["create", "feature-from-develop", "--base-branch", "develop"])
+    # When: Creating a worktree with --from-current flag
+    result = cli_runner.invoke(["create", "feature-child", "--from-current"])
 
     # Then: Command succeeds
     assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
 
-    # And: Worktree is based on develop branch commit
+    # And: Worktree is based on current branch commit (not main)
     repo_name = tmp_git_repo.name
-    worktree_path = worktree_base_path / repo_name / "feature-from-develop"
+    worktree_path = worktree_base_path / repo_name / "feature-child"
 
     worktree_commit = subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -96,7 +93,7 @@ def test_create_worktree_with_base_branch(
         check=True,
     ).stdout.strip()
 
-    assert worktree_commit == develop_commit, f"Worktree not based on develop. Expected {develop_commit}, got {worktree_commit}"
+    assert worktree_commit == current_commit, f"Worktree not based on current branch. Expected {current_commit}, got {worktree_commit}"
 
 
 @pytest.mark.e2e

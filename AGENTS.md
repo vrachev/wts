@@ -138,23 +138,23 @@ from wts.exceptions import WtsError, ValidationError
 
 @click.command()
 @click.argument('name')
-@click.option('--base-branch', default='main', help='Base branch to branch from')
+@click.option('--from-current', is_flag=True, help='Branch from current branch instead of main')
 @click.option('--description', help='Work description for status tracking')
 @click.pass_context
-def create(ctx, name: str, base_branch: str, description: str | None) -> None:
+def create(ctx, name: str, from_current: bool, description: str | None) -> None:
     """Create a new worktree"""
     try:
         manager: WorktreeManager = ctx.obj['manager']
         worktree = manager.create(
             name=name,
-            base_branch=base_branch,
+            from_current=from_current,
             description=description
         )
 
         # Success output
         click.echo(f"✓ Created worktree '{worktree.name}'")
         click.echo(f"  Path: {worktree.path}")
-        click.echo(f"  Branch: {worktree.branch} (from {base_branch})")
+        click.echo(f"  Branch: {worktree.branch}")
 
     except ValidationError as e:
         click.echo(f"Error: {e}", err=True)
@@ -195,14 +195,14 @@ class WorktreeManager:
     def create(
         self,
         name: str,
-        base_branch: str = 'main',
+        from_current: bool = False,
         description: str | None = None
     ) -> Worktree:
         """Create a new worktree with status tracking
 
         Args:
             name: Worktree/branch name
-            base_branch: Base branch to branch from
+            from_current: If True, branch from current branch; if False, branch from main
             description: Optional work description
 
         Returns:
@@ -223,6 +223,9 @@ class WorktreeManager:
         existing = self.git.list_worktrees()
         if any(wt.name == name for wt in existing):
             raise WorktreeExistsError(f"Worktree '{name}' already exists")
+
+        # Determine base branch
+        base_branch = self.git.get_current_branch() if from_current else 'main'
 
         # Create worktree
         path = self.paths.get_worktree_path(name)
@@ -405,7 +408,7 @@ def test_create_worktree_basic(tmp_git_repo: Path, cli_runner: CliRunner) -> Non
 ```python
 # Use specific types, not Any
 def create(name: str, options: dict[str, Any]) -> Worktree:  # ❌ dict[str, Any]
-def create(name: str, base_branch: str) -> Worktree:  # ✅ Specific types
+def create(name: str, from_current: bool = False) -> Worktree:  # ✅ Specific types
 
 # Use Optional or | None for nullable types
 def get_description(path: Path) -> str | None:  # ✅ Python 3.10+
@@ -422,7 +425,7 @@ def list_all() -> list[Worktree]:  # ✅ Python 3.10+
 ```python
 def create_worktree(
     name: str,
-    base_branch: str = 'main',
+    from_current: bool = False,
     description: str | None = None
 ) -> Worktree:
     """Create a new git worktree with status tracking.
@@ -430,7 +433,8 @@ def create_worktree(
     Args:
         name: Worktree/branch name. Must contain only alphanumeric
             characters, hyphens, and underscores.
-        base_branch: Base branch to branch from. Defaults to 'main'.
+        from_current: If True, branch from current branch; if False,
+            branch from main. Defaults to False.
         description: Optional description of the work to be done.
 
     Returns:

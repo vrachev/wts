@@ -35,7 +35,7 @@ Built-in defaults
 # .wts (in project root)
 worktrees:
   base_path: ~/github/worktrees  # Where to create worktrees
-  base_branch: main              # Default base branch
+  default_branch: main           # Branch to use by default (some repos use master/develop)
   auto_fetch: true               # Fetch before creating worktree
 
 cleanup:
@@ -203,9 +203,9 @@ wts/
 ### Phase 1 Commands (Core)
 
 ```bash
-# Create worktree
+# Create worktree (always branches from main by default)
 wts create <name> [options]
-  --base-branch <branch>    # Base branch (default: main)
+  --from-current            # Branch from current branch instead of main
   --no-fetch                # Skip fetching
 
 # Delete worktree
@@ -638,13 +638,13 @@ from wts.core.worktree import WorktreeManager
 
 @click.command()
 @click.argument('name')
-@click.option('--base-branch', default='main')
+@click.option('--from-current', is_flag=True, help='Branch from current branch instead of main')
 @click.pass_context
-def create(ctx, name, base_branch):
+def create(ctx, name, from_current):
     """Create a new worktree"""
     try:
         manager = ctx.obj['manager']  # From main.py context
-        worktree = manager.create(name, base_branch=base_branch)
+        worktree = manager.create(name, from_current=from_current)
         click.echo(f"✓ Created worktree '{worktree.name}'")
         click.echo(f"  Path: {worktree.path}")
     except WtsError as e:
@@ -661,12 +661,11 @@ from wts.core.git import GitRepo
 from wts.exceptions import WorktreeExistsError
 
 class WorktreeManager:
-    def __init__(self, git: GitRepo, paths: PathResolver, status: StatusManager):
+    def __init__(self, git: GitRepo, paths: PathResolver):
         self.git = git
         self.paths = paths
-        self.status = status
 
-    def create(self, name: str, base_branch: str = 'main') -> Worktree:
+    def create(self, name: str, from_current: bool = False) -> Worktree:
         # Validate
         if not self.paths.is_valid_name(name):
             raise InvalidNameError(f"Invalid name: {name}")
@@ -676,12 +675,12 @@ class WorktreeManager:
         if any(wt.name == name for wt in existing):
             raise WorktreeExistsError(f"Worktree {name} already exists")
 
+        # Determine base branch
+        base_branch = self.git.get_current_branch() if from_current else 'main'
+
         # Create
         path = self.paths.get_worktree_path(name)
         self.git.create_worktree(path, name, base_branch)
-
-        # Initialize status
-        self.status.create_status_file(path, status='todo')
 
         return Worktree(name=name, path=path, branch=name, ...)
 ```

@@ -85,21 +85,21 @@ Create a new worktree:
 wts create <name> [OPTIONS]
 
 Options:
-  --base-branch TEXT    Base branch to branch from (default: main)
-  --description TEXT    Work description for status tracking
+  --from-current       Branch from current branch instead of main
+  --description TEXT   Work description for status tracking
   --no-fetch           Skip fetching from remote
 ```
 
 Examples:
 ```bash
-# Basic creation
+# Basic creation (always branches from main)
 wts create feature-auth
 
 # With description
 wts create feature-auth --description "Implement JWT authentication"
 
-# From different base branch
-wts create hotfix-123 --base-branch production
+# Branch from current branch (when on feature-x, branches from feature-x)
+wts create feature-subtask --from-current
 ```
 
 ### delete
@@ -239,7 +239,7 @@ Project-level configuration in `.wts` file at repository root:
 ```yaml
 worktrees:
   base_path: ~/github/worktrees  # Where to create worktrees
-  base_branch: main              # Default base branch
+  default_branch: main           # Branch to use by default (some repos use master/develop)
   auto_fetch: true               # Fetch before creating worktree
 
 cleanup:

@@ -42,3 +42,7 @@ wts delete test-tmux
 wts delete test-tmux-override
 wts delete test-warp
 ```
+
+-- 
+
+* command line autocomplete

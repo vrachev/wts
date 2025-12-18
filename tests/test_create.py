@@ -123,3 +123,23 @@ def test_create_worktree_invalid_name_with_space(
 
     assert result.exit_code != 0, "Expected non-zero exit code for invalid name"
     assert "invalid" in result.output.lower(), f"Expected 'invalid' in output: {result.output}"
+
+
+@pytest.mark.e2e
+def test_create_worktree_with_terminal_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that --terminal flag is accepted and worktree is created."""
+    monkeypatch.setenv("WTS_TERMINAL", "none")
+    repo_name = tmp_git_repo.name
+
+    result = cli_runner.invoke(["create", "feature-terminal", "--terminal"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Created worktree" in result.output
+
+    worktree_path = worktree_base_path / repo_name / "feature-terminal"
+    assert worktree_path.exists(), f"Worktree path does not exist: {worktree_path}"

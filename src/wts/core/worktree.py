@@ -74,11 +74,15 @@ class WorktreeManager:
         return branch_name in result.stdout
 
     def _worktree_exists(self, name: str) -> bool:
-        """Check if a worktree with the given name already exists."""
+        """Check if a worktree with the given name already exists (path or git)."""
         worktree_path = self._get_worktree_path(name)
         if worktree_path.exists():
             return True
+        return self._is_git_worktree(name)
 
+    def _is_git_worktree(self, name: str) -> bool:
+        """Check if a worktree is registered with git."""
+        worktree_path = self._get_worktree_path(name)
         result = subprocess.run(
             ["git", "worktree", "list", "--porcelain"],
             cwd=self.repo_path,
@@ -139,7 +143,7 @@ class WorktreeManager:
         """
         self._validate_name(name)
 
-        if not self._worktree_exists(name):
+        if not self._is_git_worktree(name):
             raise WorktreeNotFoundError(f"Worktree '{name}' not found")
 
         worktree_path = self._get_worktree_path(name)

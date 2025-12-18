@@ -158,3 +158,14 @@ class WorktreeManager:
                 check=True,
                 capture_output=True,
             )
+
+    def list(self) -> list[str]:
+        """List all worktrees for this repository.
+
+        Returns:
+            List of worktree names.
+        """
+        worktree_dir = self.worktree_base / self.repo_name
+        if not worktree_dir.exists():
+            return []
+        return sorted([d.name for d in worktree_dir.iterdir() if d.is_dir()])

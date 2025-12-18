@@ -23,3 +23,15 @@ class WorktreeNotFoundError(WtsError):
     """Raised when worktree does not exist."""
 
     pass
+
+
+class EditorNotConfiguredError(WtsError):
+    """Raised when no editor is configured."""
+
+    pass
+
+
+class UnsupportedEditorError(WtsError):
+    """Raised when the specified editor is not supported."""
+
+    pass

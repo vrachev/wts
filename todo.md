@@ -1,3 +1,22 @@
+# TODO
+
+## --editor flag improvements
+
+### UX: Remove need for `--editor=default`
+- [ ] Current: `wts create foo --editor=default` or `wts create foo --editor=cursor`
+- [ ] Ideal: `wts create foo --editor` (uses WTS_EDITOR) or `wts create foo --editor=cursor`
+- [ ] Options to explore:
+  - Click callback that handles missing value
+  - Custom Click parameter type
+  - `--editor` as flag + separate `--editor-name` option
+
+### Better terminal output
+- [ ] Show which editor is being opened: `Opening in cursor...`
+- [ ] Show helpful message if editor command fails (e.g., "cursor not found in PATH")
+- [ ] Consider: show WTS_EDITOR value when using default
+
+---
+
 # --terminal flag manual tests
 
 ## iTerm2

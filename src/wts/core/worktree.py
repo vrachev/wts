@@ -5,7 +5,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from wts.exceptions import InvalidWorktreeNameError, WorktreeExistsError
+from wts.exceptions import InvalidWorktreeNameError, WorktreeExistsError, WorktreeNotFoundError
 
 
 class WorktreeManager:
@@ -125,3 +125,36 @@ class WorktreeManager:
         )
 
         return worktree_path
+
+    def delete(self, name: str, keep_branch: bool = False) -> None:
+        """Delete a worktree.
+
+        Args:
+            name: Name of the worktree to delete.
+            keep_branch: If True, keep the branch after removing the worktree.
+
+        Raises:
+            InvalidWorktreeNameError: If the name is invalid.
+            WorktreeNotFoundError: If the worktree does not exist.
+        """
+        self._validate_name(name)
+
+        if not self._worktree_exists(name):
+            raise WorktreeNotFoundError(f"Worktree '{name}' not found")
+
+        worktree_path = self._get_worktree_path(name)
+
+        subprocess.run(
+            ["git", "worktree", "remove", str(worktree_path)],
+            cwd=self.repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+        if not keep_branch:
+            subprocess.run(
+                ["git", "branch", "-D", name],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+            )

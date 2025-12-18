@@ -1,4 +1,4 @@
-"""Pytest fixtures for WTS E2E tests."""
+"""Pytest fixtures for WTS tests."""
 
 import subprocess
 from pathlib import Path
@@ -59,7 +59,6 @@ def cli_runner(tmp_git_repo: Path, worktree_base_path: Path, monkeypatch: pytest
         def invoke(self, args: list[str]):
             """Invoke CLI command with given arguments."""
             from click.testing import CliRunner
-
             from wts.cli import cli
 
             runner = CliRunner()

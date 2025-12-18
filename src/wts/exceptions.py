@@ -17,3 +17,9 @@ class InvalidWorktreeNameError(WtsError):
     """Raised when worktree name is invalid."""
 
     pass
+
+
+class WorktreeNotFoundError(WtsError):
+    """Raised when worktree does not exist."""
+
+    pass

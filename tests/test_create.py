@@ -1,4 +1,4 @@
-"""E2E tests for the wts create command."""
+"""Tests for the wts create command."""
 
 import subprocess
 from pathlib import Path
@@ -80,7 +80,9 @@ def test_create_worktree_from_current_branch(
         check=True,
     ).stdout.strip()
 
-    assert worktree_commit == current_commit, f"Worktree not based on current branch. Expected {current_commit}, got {worktree_commit}"
+    assert (
+        worktree_commit == current_commit
+    ), f"Worktree not based on current branch. Expected {current_commit}, got {worktree_commit}"
 
 
 @pytest.mark.e2e

@@ -15,10 +15,10 @@ uv run pre-commit install
 
 ```bash
 # Create a worktree (branches from main)
-wts create feature-auth
+uv run wts create feature-auth
 
 # Branch from current HEAD instead
-wts create feature-subtask --from-current
+uv run wts create feature-subtask --from-current
 ```
 
 Worktrees are created at `~/github/worktrees/{project}/{name}/` (override with `WTS_WORKTREE_BASE` env var).

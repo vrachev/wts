@@ -19,27 +19,51 @@
 
 # --terminal flag manual tests
 
-## iTerm2
-- [ ] From iTerm2: `wts create test-iterm -t` → opens new tab in iTerm2
-- [ ] With override: `WTS_TERMINAL=terminal wts create test-override -t` → opens Terminal.app
+## Environment Variables
+- `WTS_TERMINAL_MODE`: `split` (default), `tab`, or `cd`
+- `WTS_TERMINAL_SPLIT`: `vertical` (default) or `horizontal`
 
-## Terminal.app
-- [ ] From Terminal.app: `wts create test-terminal -t` → opens new tab in Terminal.app
+## iTerm2
+
+### Split (default)
+- [ ] Vertical split (default): `wts create test-iterm-vsplit -t` → vertical split
+- [ ] Horizontal split: `WTS_TERMINAL_SPLIT=horizontal wts create test-iterm-hsplit -t` → horizontal split
+
+### Tab
+- [ ] Tab mode: `WTS_TERMINAL_MODE=tab wts create test-iterm-tab -t` → new tab
+
+### CD (no new pane)
+- [ ] CD mode: `WTS_TERMINAL_MODE=cd wts create test-iterm-cd -t` → cd in current terminal
 
 ## tmux
-- [ ] From tmux: `wts create test-tmux -t` → creates new tmux window
-- [ ] With override: `WTS_TERMINAL=iterm2 wts create test-tmux-override -t` → opens iTerm2 tab
+
+### Split (default)
+- [ ] Vertical split (default): `wts create test-tmux-vsplit -t` → vertical split (panes side by side)
+- [ ] Horizontal split: `WTS_TERMINAL_SPLIT=horizontal wts create test-tmux-hsplit -t` → horizontal split (panes stacked)
+
+### Tab (window)
+- [ ] Tab mode: `WTS_TERMINAL_MODE=tab wts create test-tmux-tab -t` → new window
+
+### CD (no new pane)
+- [ ] CD mode: `WTS_TERMINAL_MODE=cd wts create test-tmux-cd -t` → cd in current pane
+
+## Terminal.app
+- [ ] From Terminal.app: `wts create test-terminal -t` → new window (no split support)
 
 ## Warp
-- [ ] From Warp: `wts create test-warp -t` → opens new Warp window
+- [ ] From Warp: `wts create test-warp -t` → new window (no split support)
 
 ## Cleanup
 ```bash
-wts delete test-iterm
-wts delete test-override
+wts delete test-iterm-vsplit
+wts delete test-iterm-hsplit
+wts delete test-iterm-tab
+wts delete test-iterm-cd
+wts delete test-tmux-vsplit
+wts delete test-tmux-hsplit
+wts delete test-tmux-tab
+wts delete test-tmux-cd
 wts delete test-terminal
-wts delete test-tmux
-wts delete test-tmux-override
 wts delete test-warp
 ```
 

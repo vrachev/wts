@@ -2,12 +2,13 @@
 
 import click
 
+from wts.cli.completion import complete_worktree_names
 from wts.core.worktree import WorktreeManager
 from wts.exceptions import InvalidWorktreeNameError, WorktreeNotFoundError
 
 
 @click.command()
-@click.argument("name")
+@click.argument("name", shell_complete=complete_worktree_names)
 @click.option("--keep-branch", is_flag=True, help="Keep the branch after removing the worktree")
 def delete(name: str, keep_branch: bool) -> None:
     """Delete the worktree with the given NAME."""

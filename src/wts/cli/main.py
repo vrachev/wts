@@ -5,6 +5,7 @@ import click
 from wts.cli.create import create
 from wts.cli.delete import delete
 from wts.cli.list import list_cmd
+from wts.cli.select import select
 
 
 @click.group()
@@ -19,3 +20,4 @@ def cli() -> None:
 cli.add_command(create)
 cli.add_command(delete)
 cli.add_command(list_cmd)
+cli.add_command(select)

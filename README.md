@@ -23,6 +23,27 @@ uv run wts create feature-subtask --from-current
 
 Worktrees are created at `~/github/worktrees/{project}/{name}/` (override with `WTS_WORKTREE_BASE` env var).
 
+## Shell Completion
+
+Enable tab completion for commands, flags, and worktree names.
+
+**Zsh:**
+```bash
+wts completion zsh >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Bash:**
+```bash
+wts completion bash >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Fish:**
+```bash
+wts completion fish > ~/.config/fish/completions/wts.fish
+```
+
 ## Development
 
 ```bash

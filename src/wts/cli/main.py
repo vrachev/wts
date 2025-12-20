@@ -2,6 +2,7 @@
 
 import click
 
+from wts.cli.completion_cmd import completion
 from wts.cli.create import create
 from wts.cli.delete import delete
 from wts.cli.list import list_cmd
@@ -17,6 +18,7 @@ def cli() -> None:
     pass
 
 
+cli.add_command(completion)
 cli.add_command(create)
 cli.add_command(delete)
 cli.add_command(list_cmd)

@@ -2,6 +2,7 @@
 
 import click
 
+from wts.cli.completion import complete_worktree_names
 from wts.core.editor import open_editor
 from wts.core.terminal import open_terminal
 from wts.core.worktree import WorktreeManager
@@ -14,7 +15,7 @@ from wts.exceptions import (
 
 
 @click.command()
-@click.argument("name")
+@click.argument("name", shell_complete=complete_worktree_names)
 @click.option("--terminal", "-t", is_flag=True, help="Open a new terminal tab in the worktree")
 @click.option(
     "--editor",

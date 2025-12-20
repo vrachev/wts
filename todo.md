@@ -69,4 +69,9 @@ wts delete test-warp
 
 -- 
 
-* command line autocomplete
+* better installation so I don't have to do `uv run wts`
+* fix `commit` command that caused it so that we lose track of worktrees that still exist
+  * or perhaps we're not deleting them fully. or something else
+* check that the config stuff was done correctly
+* check that the autocomplete stuff was done correctly
+* 

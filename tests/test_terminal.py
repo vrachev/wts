@@ -7,14 +7,6 @@ import pytest
 import wts.core.terminal as terminal_module
 
 
-@pytest.fixture(autouse=True)
-def clean_terminal_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ensure clean terminal environment for each test."""
-    monkeypatch.delenv("WTS_TERMINAL", raising=False)
-    monkeypatch.delenv("WTS_TERMINAL_MODE", raising=False)
-    monkeypatch.delenv("WTS_TERMINAL_SPLIT", raising=False)
-
-
 @pytest.mark.e2e
 def test_create_worktree_with_terminal_flag(
     tmp_git_repo: Path,

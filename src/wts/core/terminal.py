@@ -4,6 +4,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from wts.config import get_config
+
 
 def detect_terminal() -> str:
     """Detect the current terminal application.
@@ -11,7 +13,7 @@ def detect_terminal() -> str:
     Returns:
         Terminal identifier: 'iterm2', 'terminal', 'tmux', 'warp', or 'none'
     """
-    if override := os.environ.get("WTS_TERMINAL"):
+    if override := get_config().terminal:
         return override
 
     term_program = os.environ.get("TERM_PROGRAM", "")
@@ -30,12 +32,12 @@ def detect_terminal() -> str:
 
 def _get_terminal_mode() -> str:
     """Get terminal mode: 'split' (default), 'tab', or 'cd'."""
-    return os.environ.get("WTS_TERMINAL_MODE", "split")
+    return get_config().terminal_mode
 
 
 def _get_split_direction() -> str:
     """Get split direction: 'vertical' (default) or 'horizontal'."""
-    return os.environ.get("WTS_TERMINAL_SPLIT", "vertical")
+    return get_config().terminal_split
 
 
 def open_terminal(path: Path) -> None:

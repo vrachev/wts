@@ -1,10 +1,10 @@
 """Editor opener for macOS."""
 
-import os
 import subprocess
 from pathlib import Path
 from typing import Callable
 
+from wts.config import get_config
 from wts.exceptions import EditorNotConfiguredError, UnsupportedEditorError
 
 
@@ -46,9 +46,9 @@ def get_editor(override: str | None = None) -> str:
     """
     if override:
         return override
-    if editor := os.environ.get("WTS_EDITOR"):
+    if editor := get_config().editor:
         return editor
-    raise EditorNotConfiguredError("Set WTS_EDITOR or use --editor=<name>")
+    raise EditorNotConfiguredError("Set editor via 'wts config set editor <name>' or use --editor=<name>")
 
 
 def open_editor(path: Path, override: str | None = None) -> None:

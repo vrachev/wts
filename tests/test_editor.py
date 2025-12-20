@@ -7,12 +7,6 @@ import pytest
 import wts.core.editor as editor_module
 
 
-@pytest.fixture(autouse=True)
-def clean_editor_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ensure clean editor environment for each test."""
-    monkeypatch.delenv("WTS_EDITOR", raising=False)
-
-
 @pytest.mark.e2e
 def test_create_worktree_with_editor_default(
     tmp_git_repo: Path,

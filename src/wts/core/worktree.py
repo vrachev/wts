@@ -1,10 +1,10 @@
 """Worktree management core logic."""
 
-import os
 import re
 import subprocess
 from pathlib import Path
 
+from wts.config import get_config
 from wts.exceptions import (
     InvalidWorktreeNameError,
     MergeConflictError,
@@ -31,10 +31,7 @@ class WorktreeManager:
 
     def _get_worktree_base(self) -> Path:
         """Get the base path for worktrees."""
-        env_base = os.environ.get("WTS_WORKTREE_BASE")
-        if env_base:
-            return Path(env_base)
-        return Path.home() / "github" / "worktrees"
+        return get_config().worktree_base
 
     def _get_repo_name(self) -> str:
         """Get the repository name from the git root directory."""

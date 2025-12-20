@@ -4,6 +4,38 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from wts.config import reset_config
+
+
+@pytest.fixture(autouse=True)
+def reset_wts_config() -> None:
+    """Reset config singleton between tests."""
+    reset_config()
+    yield
+    reset_config()
+
+
+@pytest.fixture(autouse=True)
+def isolate_wts_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove all WTS env vars to prevent test pollution."""
+    for var in [
+        "WTS_WORKTREE_BASE",
+        "WTS_EDITOR",
+        "WTS_TERMINAL",
+        "WTS_TERMINAL_MODE",
+        "WTS_TERMINAL_SPLIT",
+    ]:
+        monkeypatch.delenv(var, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def isolate_config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Use temporary config path to avoid writing to user's real config."""
+    import wts.config
+
+    config_path = tmp_path / "config" / "wts" / "config.yaml"
+    monkeypatch.setattr(wts.config, "CONFIG_PATH", config_path)
+    return config_path
 
 
 @pytest.fixture

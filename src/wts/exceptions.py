@@ -35,3 +35,15 @@ class UnsupportedEditorError(WtsError):
     """Raised when the specified editor is not supported."""
 
     pass
+
+
+class WorktreeNotCleanError(WtsError):
+    """Raised when worktree has uncommitted changes."""
+
+    pass
+
+
+class MergeConflictError(WtsError):
+    """Raised when squash merge fails due to conflicts."""
+
+    pass

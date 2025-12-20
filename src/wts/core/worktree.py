@@ -5,7 +5,13 @@ import re
 import subprocess
 from pathlib import Path
 
-from wts.exceptions import InvalidWorktreeNameError, WorktreeExistsError, WorktreeNotFoundError
+from wts.exceptions import (
+    InvalidWorktreeNameError,
+    MergeConflictError,
+    WorktreeExistsError,
+    WorktreeNotCleanError,
+    WorktreeNotFoundError,
+)
 
 
 class WorktreeManager:
@@ -173,3 +179,100 @@ class WorktreeManager:
         if not worktree_dir.exists():
             return []
         return sorted([d.name for d in worktree_dir.iterdir() if d.is_dir()])
+
+    def _is_worktree_clean(self, worktree_path: Path) -> bool:
+        """Check if a worktree has no uncommitted changes.
+
+        Args:
+            worktree_path: Path to the worktree.
+
+        Returns:
+            True if worktree is clean, False otherwise.
+        """
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip() == ""
+
+    def _get_current_branch(self) -> str:
+        """Get the current branch name in the main repo.
+
+        Returns:
+            Current branch name.
+        """
+        result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    def commit(self, name: str, message: str, into: str = "main", cleanup: bool = True) -> None:
+        """Squash merge a worktree branch into target branch.
+
+        Args:
+            name: Name of the worktree/branch to merge.
+            message: Commit message for the squash merge.
+            into: Target branch to merge into. Defaults to "main".
+            cleanup: If True, delete worktree and branch after merge.
+
+        Raises:
+            InvalidWorktreeNameError: If the name is invalid.
+            WorktreeNotFoundError: If the worktree does not exist.
+            WorktreeNotCleanError: If worktree has uncommitted changes.
+            MergeConflictError: If squash merge fails due to conflicts.
+        """
+        self._validate_name(name)
+
+        if not self._is_git_worktree(name):
+            raise WorktreeNotFoundError(f"Worktree '{name}' not found")
+
+        worktree_path = self._get_worktree_path(name)
+        if not self._is_worktree_clean(worktree_path):
+            raise WorktreeNotCleanError(
+                f"Worktree '{name}' has uncommitted changes. " "Please commit or stash changes before merging."
+            )
+
+        original_branch = self._get_current_branch()
+
+        subprocess.run(
+            ["git", "checkout", into],
+            cwd=self.repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+        try:
+            subprocess.run(
+                ["git", "merge", "--squash", name],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+            )
+
+            subprocess.run(
+                ["git", "commit", "-m", message],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError:
+            subprocess.run(
+                ["git", "merge", "--abort"],
+                cwd=self.repo_path,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "checkout", original_branch],
+                cwd=self.repo_path,
+                capture_output=True,
+            )
+            raise MergeConflictError(f"Squash merge failed for '{name}' into '{into}'")
+
+        if cleanup:
+            self.delete(name, keep_branch=False)

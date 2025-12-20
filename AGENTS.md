@@ -126,6 +126,30 @@ except InvalidNameError as e:
 - Test actual git operations, not mocks
 - Use temporary directories for all tests
 
+### 5. Test Environment Isolation
+
+Always ensure tests are isolated from environment state:
+
+**Pattern: Use autouse fixtures to clear environment variables**
+```python
+@pytest.fixture(autouse=True)
+def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure clean environment for each test."""
+    monkeypatch.delenv("WTS_TERMINAL", raising=False)
+    monkeypatch.delenv("WTS_EDITOR", raising=False)
+    # Clear all WTS_* env vars that could affect behavior
+```
+
+**Don'ts:**
+- ❌ Don't rely on test execution order
+- ❌ Don't assume env vars are unset in CI
+- ❌ Don't scatter `delenv` calls across individual tests
+
+**Do's:**
+- ✅ Use autouse fixtures to clear env vars at module level
+- ✅ Clear ALL relevant env vars, not just the ones you're setting
+- ✅ Use `raising=False` when deleting env vars that may not exist
+
 ## Code Patterns
 
 ### Click Commands (CLI Layer)

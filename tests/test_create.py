@@ -6,6 +6,13 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def clean_wts_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure clean WTS environment for each test."""
+    monkeypatch.delenv("WTS_TERMINAL", raising=False)
+    monkeypatch.delenv("WTS_EDITOR", raising=False)
+
+
 @pytest.mark.e2e
 def test_create_worktree_basic(
     tmp_git_repo: Path,

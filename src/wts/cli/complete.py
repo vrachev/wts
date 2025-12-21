@@ -1,4 +1,4 @@
-"""CLI command for committing (squash merging) worktrees."""
+"""CLI command for completing (squash merging) worktrees."""
 
 import click
 
@@ -24,7 +24,7 @@ from wts.exceptions import (
     default="main",
     help="Target branch to merge into (default: main)",
 )
-def commit(name: str, message: str, no_cleanup: bool, into: str) -> None:
+def complete(name: str, message: str, no_cleanup: bool, into: str) -> None:
     """Squash merge worktree NAME into target branch with MESSAGE.
 
     Performs a squash merge of the worktree's branch into the target branch
@@ -32,15 +32,15 @@ def commit(name: str, message: str, no_cleanup: bool, into: str) -> None:
 
     Examples:
 
-        wts commit feature-auth "Add JWT authentication"
+        wts complete feature-auth "Add JWT authentication"
 
-        wts commit feature-api "Add REST API" --into develop
+        wts complete feature-api "Add REST API" --into develop
 
-        wts commit bugfix-123 "Fix login bug" --no-cleanup
+        wts complete bugfix-123 "Fix login bug" --no-cleanup
     """
     try:
         manager = WorktreeManager()
-        manager.commit(name, message, into=into, cleanup=not no_cleanup)
+        manager.complete(name, message, into=into, cleanup=not no_cleanup)
         if no_cleanup:
             click.echo(f"Merged worktree '{name}' into '{into}'")
         else:

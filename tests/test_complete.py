@@ -1,4 +1,4 @@
-"""Tests for the wts commit command."""
+"""Tests for the wts complete command."""
 
 import subprocess
 from pathlib import Path
@@ -26,36 +26,36 @@ def _make_commit_in_worktree(worktree_path: Path, filename: str, content: str) -
 
 
 @pytest.mark.e2e
-def test_commit_worktree_not_found(
+def test_complete_worktree_not_found(
     tmp_git_repo: Path,
     cli_runner,
 ) -> None:
-    """Test that committing a non-existent worktree fails."""
-    result = cli_runner.invoke(["commit", "nonexistent", "Some message"])
+    """Test that completing a non-existent worktree fails."""
+    result = cli_runner.invoke(["complete", "nonexistent", "Some message"])
 
     assert result.exit_code != 0, "Expected non-zero exit code for non-existent worktree"
     assert "not found" in result.output.lower(), f"Expected 'not found' in output: {result.output}"
 
 
 @pytest.mark.e2e
-def test_commit_invalid_worktree_name(
+def test_complete_invalid_worktree_name(
     tmp_git_repo: Path,
     cli_runner,
 ) -> None:
     """Test that invalid worktree names are rejected."""
-    result = cli_runner.invoke(["commit", "foo/bar", "Some message"])
+    result = cli_runner.invoke(["complete", "foo/bar", "Some message"])
 
     assert result.exit_code != 0, "Expected non-zero exit code for invalid name"
     assert "invalid" in result.output.lower(), f"Expected 'invalid' in output: {result.output}"
 
 
 @pytest.mark.e2e
-def test_commit_worktree_with_uncommitted_changes(
+def test_complete_worktree_with_uncommitted_changes(
     tmp_git_repo: Path,
     cli_runner,
     worktree_base_path: Path,
 ) -> None:
-    """Test that committing a worktree with uncommitted changes fails."""
+    """Test that completing a worktree with uncommitted changes fails."""
     repo_name = tmp_git_repo.name
     worktree_path = worktree_base_path / repo_name / "feature-dirty"
 
@@ -63,14 +63,14 @@ def test_commit_worktree_with_uncommitted_changes(
     # Create uncommitted changes
     (worktree_path / "uncommitted.txt").write_text("uncommitted content")
 
-    result = cli_runner.invoke(["commit", "feature-dirty", "Try to commit"])
+    result = cli_runner.invoke(["complete", "feature-dirty", "Try to complete"])
 
     assert result.exit_code != 0, "Expected non-zero exit code for dirty worktree"
     assert "uncommitted" in result.output.lower(), f"Expected 'uncommitted' in output: {result.output}"
 
 
 @pytest.mark.e2e
-def test_commit_basic_squash_merge(
+def test_complete_basic_squash_merge(
     tmp_git_repo: Path,
     cli_runner,
     worktree_base_path: Path,
@@ -84,8 +84,8 @@ def test_commit_basic_squash_merge(
     _make_commit_in_worktree(worktree_path, "feature.txt", "feature content")
     _make_commit_in_worktree(worktree_path, "feature2.txt", "feature2 content")
 
-    # Commit (squash merge)
-    result = cli_runner.invoke(["commit", "feature-squash", "Add feature"])
+    # Complete (squash merge)
+    result = cli_runner.invoke(["complete", "feature-squash", "Add feature"])
 
     assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
     assert "Merged worktree" in result.output
@@ -118,7 +118,7 @@ def test_commit_basic_squash_merge(
 
 
 @pytest.mark.e2e
-def test_commit_with_no_cleanup(
+def test_complete_with_no_cleanup(
     tmp_git_repo: Path,
     cli_runner,
     worktree_base_path: Path,
@@ -130,7 +130,7 @@ def test_commit_with_no_cleanup(
     cli_runner.invoke(["create", "feature-keep"])
     _make_commit_in_worktree(worktree_path, "keep.txt", "keep content")
 
-    result = cli_runner.invoke(["commit", "feature-keep", "Add keep feature", "--no-cleanup"])
+    result = cli_runner.invoke(["complete", "feature-keep", "Add keep feature", "--no-cleanup"])
 
     assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
     assert "Merged worktree" in result.output
@@ -150,7 +150,7 @@ def test_commit_with_no_cleanup(
 
 
 @pytest.mark.e2e
-def test_commit_into_different_branch(
+def test_complete_into_different_branch(
     tmp_git_repo: Path,
     cli_runner,
     worktree_base_path: Path,
@@ -176,7 +176,7 @@ def test_commit_into_different_branch(
     cli_runner.invoke(["create", "feature-develop"])
     _make_commit_in_worktree(worktree_path, "develop.txt", "develop content")
 
-    result = cli_runner.invoke(["commit", "feature-develop", "Add develop feature", "--into", "develop"])
+    result = cli_runner.invoke(["complete", "feature-develop", "Add develop feature", "--into", "develop"])
 
     assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
     assert "into 'develop'" in result.output

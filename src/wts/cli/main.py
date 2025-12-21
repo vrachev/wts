@@ -2,7 +2,7 @@
 
 import click
 
-from wts.cli.commit import commit
+from wts.cli.complete import complete
 from wts.cli.completion_cmd import completion
 from wts.cli.config import config
 from wts.cli.create import create
@@ -20,7 +20,7 @@ def cli() -> None:
     pass
 
 
-cli.add_command(commit)
+cli.add_command(complete)
 cli.add_command(completion)
 cli.add_command(config)
 cli.add_command(create)

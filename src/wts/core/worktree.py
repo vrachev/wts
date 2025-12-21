@@ -209,7 +209,7 @@ class WorktreeManager:
         )
         return result.stdout.strip()
 
-    def commit(self, name: str, message: str, into: str = "main", cleanup: bool = True) -> None:
+    def complete(self, name: str, message: str, into: str = "main", cleanup: bool = True) -> None:
         """Squash merge a worktree branch into target branch.
 
         Args:

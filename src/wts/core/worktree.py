@@ -92,7 +92,12 @@ class WorktreeManager:
             capture_output=True,
             text=True,
         )
-        return str(worktree_path) in result.stdout
+        for line in result.stdout.splitlines():
+            if line.startswith("worktree "):
+                path = line[9:]  # Remove "worktree " prefix
+                if path == str(worktree_path):
+                    return True
+        return False
 
     def create(self, name: str, from_current: bool = False) -> Path:
         """Create a new worktree.

@@ -7,18 +7,30 @@ CLI for managing git worktrees for parallel AI agent development.
 ```bash
 git clone https://github.com/yourusername/wts.git
 cd wts
+uv tool install -e .
+```
+
+If `wts` command is not found, run `uv tool update-shell` and restart your shell.
+
+### Development Setup
+
+```bash
+git clone https://github.com/yourusername/wts.git
+cd wts
 uv sync --extra dev
 uv run pre-commit install
 ```
+
+Use `uv run wts` to run the development version from your local source.
 
 ## Usage
 
 ```bash
 # Create a worktree (branches from main)
-uv run wts create feature-auth
+wts create feature-auth
 
 # Branch from current HEAD instead
-uv run wts create feature-subtask --from-current
+wts create feature-subtask --from-current
 ```
 
 Worktrees are created at `~/github/worktrees/{project}/{name}/` (override with `WTS_WORKTREE_BASE` env var).
@@ -46,11 +58,15 @@ wts completion fish > ~/.config/fish/completions/wts.fish
 
 ## Development
 
+Run tests and linting with the project's virtual environment:
+
 ```bash
 uv run pytest tests/
 uv run pytest tests/ --cov=src/wts
 uv run pre-commit run --all-files
 ```
+
+To test your local changes, use `uv run wts` instead of the installed `wts` command.
 
 ## License
 

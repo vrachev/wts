@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from wts.config import CONFIG_PATH, CONFIG_SCHEMA, Config, get_config
+from wts.config import CONFIG_SCHEMA, Config, get_config, get_config_path
 
 
 @click.group()
@@ -19,9 +19,10 @@ def config() -> None:
 def show() -> None:
     """Show current configuration."""
     cfg = get_config()
+    config_path = get_config_path()
 
-    click.echo(f"Config file: {CONFIG_PATH}")
-    click.echo(f"  exists: {CONFIG_PATH.exists()}")
+    click.echo(f"Config file: {config_path}")
+    click.echo(f"  exists: {config_path.exists()}")
     click.echo()
     click.echo("Current values:")
     click.echo(f"  worktree_base:  {cfg.worktree_base}")
@@ -29,6 +30,7 @@ def show() -> None:
     click.echo(f"  terminal:       {cfg.terminal or '(auto-detect)'}")
     click.echo(f"  terminal_mode:  {cfg.terminal_mode}")
     click.echo(f"  terminal_split: {cfg.terminal_split}")
+    click.echo(f"  init_script:    {cfg.init_script or '(not set)'}")
 
 
 @config.command("set")
@@ -65,6 +67,8 @@ def set_value(key: str, value: str) -> None:
         if value not in ("vertical", "horizontal"):
             raise click.ClickException("terminal_split must be: vertical or horizontal")
         cfg.terminal_split = value  # type: ignore[assignment]
+    elif key == "init_script":
+        cfg.init_script = value
 
     cfg.save()
     click.echo(f"Set {key} = {value}")
@@ -99,16 +103,17 @@ def list_options() -> None:
 @config.command("path")
 def show_path() -> None:
     """Show the config file path."""
-    click.echo(CONFIG_PATH)
+    click.echo(get_config_path())
 
 
 @config.command("edit")
 def edit_config() -> None:
     """Open config file in default editor."""
+    config_path = get_config_path()
     # Create config file with defaults if it doesn't exist
-    if not CONFIG_PATH.exists():
+    if not config_path.exists():
         Config().save()
-        click.echo(f"Created default config at {CONFIG_PATH}")
+        click.echo(f"Created default config at {config_path}")
 
     editor = os.environ.get("EDITOR", "vim")
-    subprocess.run([editor, str(CONFIG_PATH)])
+    subprocess.run([editor, str(config_path)])

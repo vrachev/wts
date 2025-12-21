@@ -23,11 +23,12 @@ from wts.exceptions import (
     default=None,
     help="Open in editor (--editor=default uses WTS_EDITOR, or specify: --editor=cursor)",
 )
-def create(name: str, from_current: bool, terminal: bool, editor: str | None) -> None:
+@click.option("--no-init", is_flag=True, help="Skip running the init script")
+def create(name: str, from_current: bool, terminal: bool, editor: str | None, no_init: bool) -> None:
     """Create a new worktree with the given NAME."""
     try:
         manager = WorktreeManager()
-        worktree_path = manager.create(name, from_current=from_current)
+        worktree_path = manager.create(name, from_current=from_current, run_init=not no_init)
         click.echo(f"Created worktree '{name}' at {worktree_path}")
         if terminal:
             open_terminal(worktree_path)

@@ -2,9 +2,10 @@
 
 import re
 import subprocess
+import sys
 from pathlib import Path
 
-from wts.config import get_config
+from wts.config import Config
 from wts.exceptions import (
     InvalidWorktreeNameError,
     MergeConflictError,
@@ -31,7 +32,7 @@ class WorktreeManager:
 
     def _get_worktree_base(self) -> Path:
         """Get the base path for worktrees."""
-        return get_config().worktree_base
+        return Config.load(self.repo_path).worktree_base
 
     def _get_repo_name(self) -> str:
         """Get the repository name from the git root directory."""
@@ -83,6 +84,34 @@ class WorktreeManager:
             return True
         return self._is_git_worktree(name)
 
+    def _run_init_script(self, worktree_path: Path, script: str) -> bool:
+        """Run the init script in a worktree directory.
+
+        Args:
+            worktree_path: Path to the worktree.
+            script: Shell command to run.
+
+        Returns:
+            True if script succeeded, False otherwise.
+        """
+        try:
+            result = subprocess.run(
+                script,
+                shell=True,
+                cwd=worktree_path,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                print(f"Warning: init script failed with exit code {result.returncode}", file=sys.stderr)
+                if result.stderr:
+                    print(result.stderr, file=sys.stderr)
+                return False
+            return True
+        except Exception as e:
+            print(f"Warning: init script failed: {e}", file=sys.stderr)
+            return False
+
     def _is_git_worktree(self, name: str) -> bool:
         """Check if a worktree is registered with git."""
         worktree_path = self._get_worktree_path(name)
@@ -99,12 +128,13 @@ class WorktreeManager:
                     return True
         return False
 
-    def create(self, name: str, from_current: bool = False) -> Path:
+    def create(self, name: str, from_current: bool = False, run_init: bool = True) -> Path:
         """Create a new worktree.
 
         Args:
             name: Name for the worktree and branch.
             from_current: If True, branch from current HEAD. Otherwise, branch from main.
+            run_init: If True, run the init script after creating the worktree.
 
         Returns:
             Path to the created worktree.
@@ -135,6 +165,12 @@ class WorktreeManager:
             check=True,
             capture_output=True,
         )
+
+        # Run init script if configured
+        if run_init:
+            config = Config.load(self.repo_path)
+            if config.init_script:
+                self._run_init_script(worktree_path, config.init_script)
 
         return worktree_path
 

@@ -101,3 +101,69 @@ def test_create_worktree_unsupported_editor_error(
     assert result.exit_code != 0, f"Expected non-zero exit code. Output: {result.output}"
     assert "emacs" in result.output.lower()
     assert "supported" in result.output.lower()
+
+
+@pytest.mark.e2e
+def test_create_worktree_with_editor_claude(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that --editor=claude opens a terminal with claude command."""
+    import wts.core.terminal as terminal_module
+
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    repo_name = tmp_git_repo.name
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-claude", "--editor=claude"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Created worktree" in result.output
+
+    worktree_path = worktree_base_path / repo_name / "feature-claude"
+    assert worktree_path.exists()
+
+    # Check that subprocess.run was called with osascript containing claude command
+    mock_subprocess.run.assert_called_once()
+    call_args = mock_subprocess.run.call_args[0][0]
+    assert call_args[0] == "osascript"
+    script = call_args[2]
+    assert str(worktree_path) in script
+    assert "claude" in script
+
+
+@pytest.mark.e2e
+def test_select_worktree_with_editor_claude(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that select --editor=claude opens a terminal with claude command."""
+    import wts.core.terminal as terminal_module
+
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    repo_name = tmp_git_repo.name
+
+    # First create the worktree
+    result = cli_runner.invoke(["create", "feature-claude-select"])
+    assert result.exit_code == 0
+
+    worktree_path = worktree_base_path / repo_name / "feature-claude-select"
+
+    # Now select it with --editor=claude
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["select", "feature-claude-select", "--editor=claude"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Selected worktree" in result.output
+
+    # Check that subprocess.run was called with osascript containing claude command
+    mock_subprocess.run.assert_called_once()
+    call_args = mock_subprocess.run.call_args[0][0]
+    assert call_args[0] == "osascript"
+    script = call_args[2]
+    assert str(worktree_path) in script
+    assert "claude" in script

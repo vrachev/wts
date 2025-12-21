@@ -40,8 +40,12 @@ def _get_split_direction() -> str:
     return get_config().terminal_split
 
 
-def open_terminal(path: Path) -> None:
+def open_terminal(path: Path, command: str | None = None) -> None:
     """Open a new terminal split/tab/window at the given path.
+
+    Args:
+        path: Directory path to open terminal in
+        command: Optional command to run after cd (e.g., "claude" for Claude Code)
 
     Behavior controlled by environment variables:
         WTS_TERMINAL_MODE: 'split' (default), 'tab', or 'cd'
@@ -60,24 +64,25 @@ def open_terminal(path: Path) -> None:
         return
 
     if terminal == "iterm2":
-        _open_iterm2(path)
+        _open_iterm2(path, command)
     elif terminal == "tmux":
-        _open_tmux(path)
+        _open_tmux(path, command)
     elif terminal == "warp":
-        _open_warp(path)
+        _open_warp(path, command)
     else:
-        _open_terminal_app(path)
+        _open_terminal_app(path, command)
 
 
-def _open_iterm2(path: Path) -> None:
+def _open_iterm2(path: Path, command: str | None = None) -> None:
     mode = _get_terminal_mode()
+    cmd_text = f"cd {path}" if command is None else f"cd {path} && {command}"
 
     if mode == "cd":
         # Just cd in current session, no new split/tab
         script = f"""
         tell application "iTerm2"
             tell current session of current window
-                write text "cd {path}"
+                write text "{cmd_text}"
             end tell
         end tell
         """
@@ -87,7 +92,7 @@ def _open_iterm2(path: Path) -> None:
             tell current window
                 create tab with default profile
                 tell current session
-                    write text "cd {path}"
+                    write text "{cmd_text}"
                 end tell
             end tell
         end tell
@@ -102,21 +107,22 @@ def _open_iterm2(path: Path) -> None:
                 set newSession to ({split_cmd} with default profile)
             end tell
             tell newSession
-                write text "cd {path}"
+                write text "{cmd_text}"
             end tell
         end tell
         """
     subprocess.run(["osascript", "-e", script], check=True, capture_output=True)
 
 
-def _open_terminal_app(path: Path) -> None:
+def _open_terminal_app(path: Path, command: str | None = None) -> None:
     mode = _get_terminal_mode()
+    cmd_text = f"cd {path}" if command is None else f"cd {path} && {command}"
 
     if mode == "cd":
         # Just cd in current window
         script = f"""
         tell application "Terminal"
-            do script "cd {path}" in front window
+            do script "{cmd_text}" in front window
         end tell
         """
     else:
@@ -124,28 +130,52 @@ def _open_terminal_app(path: Path) -> None:
         script = f"""
         tell application "Terminal"
             activate
-            do script "cd {path}"
+            do script "{cmd_text}"
         end tell
         """
     subprocess.run(["osascript", "-e", script], check=True, capture_output=True)
 
 
-def _open_tmux(path: Path) -> None:
+def _open_tmux(path: Path, command: str | None = None) -> None:
     mode = _get_terminal_mode()
+    cmd_text = f"cd {path}" if command is None else f"cd {path} && {command}"
 
     if mode == "cd":
         # Just cd in current pane, no new split/window
-        subprocess.run(["tmux", "send-keys", f"cd {path}", "Enter"], check=True, capture_output=True)
+        subprocess.run(["tmux", "send-keys", cmd_text, "Enter"], check=True, capture_output=True)
     elif mode == "tab":
-        subprocess.run(["tmux", "new-window", "-c", str(path)], check=True, capture_output=True)
+        if command:
+            subprocess.run(["tmux", "new-window", "-c", str(path), command], check=True, capture_output=True)
+        else:
+            subprocess.run(["tmux", "new-window", "-c", str(path)], check=True, capture_output=True)
     else:
         direction = _get_split_direction()
         # tmux: -h splits horizontally (panes side by side), -v splits vertically (panes stacked)
         # This is opposite of iTerm2's naming, so we flip it to match user expectations
         split_flag = "-h" if direction == "vertical" else "-v"
-        subprocess.run(["tmux", "split-window", split_flag, "-c", str(path)], check=True, capture_output=True)
+        if command:
+            subprocess.run(
+                ["tmux", "split-window", split_flag, "-c", str(path), command], check=True, capture_output=True
+            )
+        else:
+            subprocess.run(["tmux", "split-window", split_flag, "-c", str(path)], check=True, capture_output=True)
 
 
-def _open_warp(path: Path) -> None:
+def _open_warp(path: Path, command: str | None = None) -> None:
     # Warp doesn't have a CLI API for splits, always opens new window
     subprocess.run(["open", "-a", "Warp", str(path)], check=True, capture_output=True)
+    # If a command is specified, use AppleScript to send it to Warp
+    if command:
+        import time
+
+        time.sleep(0.5)  # Give Warp time to open
+        script = f"""
+        tell application "Warp"
+            activate
+            tell application "System Events"
+                keystroke "{command}"
+                key code 36
+            end tell
+        end tell
+        """
+        subprocess.run(["osascript", "-e", script], check=True, capture_output=True)

@@ -24,11 +24,18 @@ def _open_subl(path: Path) -> None:
     subprocess.run(["subl", str(path)], check=True, capture_output=True)
 
 
+def _open_claude_code(path: Path) -> None:
+    from wts.core.terminal import open_terminal
+
+    open_terminal(path, command="claude")
+
+
 EDITOR_OPENERS: dict[str, Callable[[Path], None]] = {
     "cursor": _open_cursor,
     "code": _open_code,
     "zed": _open_zed,
     "subl": _open_subl,
+    "claude": _open_claude_code,
 }
 
 

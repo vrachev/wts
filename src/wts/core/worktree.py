@@ -214,14 +214,40 @@ class WorktreeManager:
         )
         return result.stdout.strip()
 
-    def complete(self, name: str, message: str, into: str = "main", cleanup: bool = True) -> None:
+    def _get_latest_commit_message(self, branch: str) -> str:
+        """Get the latest commit message from a branch.
+
+        Args:
+            branch: The branch name to get the commit message from.
+
+        Returns:
+            The latest commit message.
+        """
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%B", branch],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    def complete(
+        self,
+        name: str,
+        message: str | None = None,
+        into: str = "main",
+        cleanup: bool = True,
+        use_latest_msg: bool = False,
+    ) -> None:
         """Squash merge a worktree branch into target branch.
 
         Args:
             name: Name of the worktree/branch to merge.
-            message: Commit message for the squash merge.
+            message: Commit message for the squash merge. Required unless use_latest_msg is True.
             into: Target branch to merge into. Defaults to "main".
             cleanup: If True, delete worktree and branch after merge.
+            use_latest_msg: If True, use the latest commit message from the branch.
 
         Raises:
             InvalidWorktreeNameError: If the name is invalid.
@@ -239,6 +265,11 @@ class WorktreeManager:
             raise WorktreeNotCleanError(
                 f"Worktree '{name}' has uncommitted changes. " "Please commit or stash changes before merging."
             )
+
+        if use_latest_msg:
+            message = self._get_latest_commit_message(name)
+
+        assert message is not None, "Message must be provided or use_latest_msg must be True"
 
         original_branch = self._get_current_branch()
 

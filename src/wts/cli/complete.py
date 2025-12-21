@@ -13,7 +13,13 @@ from wts.exceptions import (
 
 @click.command()
 @click.argument("name")
-@click.argument("message")
+@click.argument("message", required=False)
+@click.option(
+    "--use-latest-msg",
+    "-l",
+    is_flag=True,
+    help="Use the latest commit message from the worktree branch",
+)
 @click.option(
     "--no-cleanup",
     is_flag=True,
@@ -24,7 +30,7 @@ from wts.exceptions import (
     default="main",
     help="Target branch to merge into (default: main)",
 )
-def complete(name: str, message: str, no_cleanup: bool, into: str) -> None:
+def complete(name: str, message: str | None, use_latest_msg: bool, no_cleanup: bool, into: str) -> None:
     """Squash merge worktree NAME into target branch with MESSAGE.
 
     Performs a squash merge of the worktree's branch into the target branch
@@ -34,13 +40,19 @@ def complete(name: str, message: str, no_cleanup: bool, into: str) -> None:
 
         wts complete feature-auth "Add JWT authentication"
 
-        wts complete feature-api "Add REST API" --into develop
+        wts complete feature-auth --use-latest-msg
+
+        wts complete feature-api -l --into develop
 
         wts complete bugfix-123 "Fix login bug" --no-cleanup
     """
+    if message and use_latest_msg:
+        raise click.ClickException("Cannot specify both MESSAGE and --use-latest-msg")
+    if not message and not use_latest_msg:
+        raise click.ClickException("Must specify either MESSAGE or --use-latest-msg")
     try:
         manager = WorktreeManager()
-        manager.complete(name, message, into=into, cleanup=not no_cleanup)
+        manager.complete(name, message, into=into, cleanup=not no_cleanup, use_latest_msg=use_latest_msg)
         if no_cleanup:
             click.echo(f"Merged worktree '{name}' into '{into}'")
         else:

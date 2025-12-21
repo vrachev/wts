@@ -187,3 +187,107 @@ def test_complete_into_different_branch(
 
     subprocess.run(["git", "checkout", "main"], cwd=tmp_git_repo, check=True, capture_output=True)
     assert not (tmp_git_repo / "develop.txt").exists()
+
+
+@pytest.mark.e2e
+def test_complete_use_latest_msg_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test squash merge using --use-latest-msg flag."""
+    repo_name = tmp_git_repo.name
+    worktree_path = worktree_base_path / repo_name / "feature-latest"
+
+    cli_runner.invoke(["create", "feature-latest"])
+    # Make commits with specific messages
+    (worktree_path / "file1.txt").write_text("content1")
+    subprocess.run(["git", "add", "."], cwd=worktree_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "First commit"],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
+    )
+    (worktree_path / "file2.txt").write_text("content2")
+    subprocess.run(["git", "add", "."], cwd=worktree_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Latest commit message"],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
+    )
+
+    result = cli_runner.invoke(["complete", "feature-latest", "--use-latest-msg"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Merged worktree" in result.output
+
+    # Verify the commit message is the latest one
+    git_log = subprocess.run(
+        ["git", "log", "--oneline", "-1"],
+        cwd=tmp_git_repo,
+        capture_output=True,
+        text=True,
+    )
+    assert "Latest commit message" in git_log.stdout, f"Expected 'Latest commit message' in: {git_log.stdout}"
+
+
+@pytest.mark.e2e
+def test_complete_use_latest_msg_shorthand(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test squash merge using -l shorthand."""
+    repo_name = tmp_git_repo.name
+    worktree_path = worktree_base_path / repo_name / "feature-short"
+
+    cli_runner.invoke(["create", "feature-short"])
+    (worktree_path / "file.txt").write_text("content")
+    subprocess.run(["git", "add", "."], cwd=worktree_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Shorthand test commit"],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
+    )
+
+    result = cli_runner.invoke(["complete", "feature-short", "-l"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+
+    git_log = subprocess.run(
+        ["git", "log", "--oneline", "-1"],
+        cwd=tmp_git_repo,
+        capture_output=True,
+        text=True,
+    )
+    assert "Shorthand test commit" in git_log.stdout
+
+
+@pytest.mark.e2e
+def test_complete_error_both_message_and_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test error when both message and --use-latest-msg are provided."""
+    cli_runner.invoke(["create", "feature-both"])
+
+    result = cli_runner.invoke(["complete", "feature-both", "Some message", "--use-latest-msg"])
+
+    assert result.exit_code != 0, "Expected non-zero exit code"
+    assert "Cannot specify both" in result.output
+
+
+@pytest.mark.e2e
+def test_complete_error_neither_message_nor_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+) -> None:
+    """Test error when neither message nor --use-latest-msg is provided."""
+    result = cli_runner.invoke(["complete", "feature-none"])
+
+    assert result.exit_code != 0, "Expected non-zero exit code"
+    assert "Must specify either" in result.output

@@ -74,4 +74,4 @@ wts delete test-warp
   * or perhaps we're not deleting them fully. or something else
 * check that the config stuff was done correctly
 * check that the autocomplete stuff was done correctly
-* 
+* claude settings should also be copied

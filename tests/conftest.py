@@ -34,7 +34,7 @@ def isolate_config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
     import wts.config
 
     config_path = tmp_path / "config" / "wts" / "config.yaml"
-    monkeypatch.setattr(wts.config, "CONFIG_PATH", config_path)
+    monkeypatch.setattr(wts.config, "get_config_path", lambda repo_root=None: config_path)
     return config_path
 
 
@@ -88,12 +88,12 @@ def cli_runner(tmp_git_repo: Path, worktree_base_path: Path, monkeypatch: pytest
     class WtsCliRunner:
         """Wrapper around Click's CliRunner with simpler interface."""
 
-        def invoke(self, args: list[str]):
+        def invoke(self, args: list[str], input: str | None = None):
             """Invoke CLI command with given arguments."""
             from click.testing import CliRunner
             from wts.cli import cli
 
             runner = CliRunner()
-            return runner.invoke(cli, args)
+            return runner.invoke(cli, args, input=input)
 
     return WtsCliRunner()

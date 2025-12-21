@@ -29,7 +29,7 @@ def test_config_load_defaults() -> None:
 
 def test_config_from_file() -> None:
     """Test loading config from file."""
-    config_path = wts.config.CONFIG_PATH
+    config_path = wts.config.get_config_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
         """
@@ -51,7 +51,7 @@ terminal_split: horizontal
 
 def test_env_overrides_file(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that env vars override file config."""
-    config_path = wts.config.CONFIG_PATH
+    config_path = wts.config.get_config_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text("editor: cursor")
 
@@ -77,7 +77,7 @@ def test_config_save() -> None:
     config.editor = "zed"
     config.save()
 
-    assert wts.config.CONFIG_PATH.exists()
+    assert wts.config.get_config_path().exists()
     loaded = Config.load()
     assert loaded.editor == "zed"
 
@@ -87,7 +87,7 @@ def test_config_save_only_non_defaults() -> None:
     config = Config()
     config.save()
 
-    content = wts.config.CONFIG_PATH.read_text()
+    content = wts.config.get_config_path().read_text()
     # worktree_base is always written
     assert "worktree_base" in content
     # defaults are not written
@@ -112,7 +112,7 @@ def test_reset_config_clears_singleton() -> None:
 
 def test_config_path_expansion() -> None:
     """Test that ~ is expanded in paths."""
-    config_path = wts.config.CONFIG_PATH
+    config_path = wts.config.get_config_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text("worktree_base: ~/custom/worktrees")
 

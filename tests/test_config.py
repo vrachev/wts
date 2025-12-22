@@ -82,17 +82,23 @@ def test_config_save() -> None:
     assert loaded.editor == "zed"
 
 
-def test_config_save_only_non_defaults() -> None:
-    """Test that save only writes non-default values."""
+def test_config_save_includes_all_settings() -> None:
+    """Test that save writes all settings with documentation."""
     config = Config()
     config.save()
 
     content = wts.config.get_config_path().read_text()
-    # worktree_base is always written
-    assert "worktree_base" in content
-    # defaults are not written
-    assert "terminal_mode" not in content
-    assert "terminal_split" not in content
+    # All settings are included
+    assert "worktree_base:" in content
+    assert "terminal_mode: split" in content
+    assert "terminal_split: vertical" in content
+    # None values are commented out
+    assert "# editor:" in content
+    assert "# terminal:" in content
+    assert "# init_script:" in content
+    # Documentation comments are included
+    assert "# Env: WTS_WORKTREE_BASE" in content
+    assert "# Base directory for storing worktrees" in content
 
 
 def test_get_config_singleton() -> None:

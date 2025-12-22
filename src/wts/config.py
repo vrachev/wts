@@ -191,8 +191,25 @@ class Config:
 
         return config
 
+    def _serialize_value(self, key: str) -> str | None:
+        """Serialize a config value to string for YAML output.
+
+        Returns None if the value should be commented out.
+        """
+        value = getattr(self, key)
+        if value is None:
+            return None
+        if key == "worktree_base":
+            # Use ~ shorthand for home directory
+            path_str = str(value)
+            home = str(Path.home())
+            if path_str.startswith(home):
+                return "~" + path_str[len(home) :]
+            return path_str
+        return str(value)
+
     def save(self, repo_root: Path | None = None, local: bool = True) -> None:
-        """Save current config to file.
+        """Save current config to file with documentation comments.
 
         Args:
             repo_root: Repository root path. If None, detects from current directory.
@@ -201,23 +218,26 @@ class Config:
         config_path = get_config_path(repo_root, local=local)
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        data: dict[str, str] = {
-            "worktree_base": str(self.worktree_base),
-        }
-        # Only write non-default values
-        if self.editor:
-            data["editor"] = self.editor
-        if self.terminal:
-            data["terminal"] = self.terminal
-        if self.terminal_mode != "split":
-            data["terminal_mode"] = self.terminal_mode
-        if self.terminal_split != "vertical":
-            data["terminal_split"] = self.terminal_split
-        if self.init_script:
-            data["init_script"] = self.init_script
+        lines: list[str] = []
+        for key, schema in CONFIG_SCHEMA.items():
+            # Add description comment
+            lines.append(f"# {schema['description']}")
+            # Add env var comment
+            lines.append(f"# Env: {schema['env']}")
+            # Add the key: value (commented out if None)
+            value = self._serialize_value(key)
+            if value is None:
+                lines.append(f"# {key}:")
+            else:
+                lines.append(f"{key}: {value}")
+            lines.append("")  # Blank line between settings
+
+        # Remove trailing blank line
+        if lines and lines[-1] == "":
+            lines.pop()
 
         with open(config_path, "w") as f:
-            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+            f.write("\n".join(lines) + "\n")
 
 
 # Module-level singleton (lazy loaded)

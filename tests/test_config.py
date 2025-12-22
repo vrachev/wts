@@ -178,4 +178,4 @@ def test_config_cli_path(cli_runner) -> None:
     """Test wts config path command."""
     result = cli_runner.invoke(["config", "path"])
     assert result.exit_code == 0
-    assert "config.yaml" in result.output
+    assert "settings.local.yaml" in result.output

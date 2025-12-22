@@ -4,12 +4,13 @@ import os
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import yaml
 
 CONFIG_DIR = ".wts"
-CONFIG_FILENAME = "settings.local.yaml"
+CONFIG_FILENAME_LOCAL = "settings.local.yaml"
+CONFIG_FILENAME_PROJECT = "settings.yaml"
 
 
 def get_repo_root(cwd: Path | None = None) -> Path:
@@ -37,18 +38,40 @@ def get_repo_root(cwd: Path | None = None) -> Path:
         raise RuntimeError("Not in a git repository")
 
 
-def get_config_path(repo_root: Path | None = None) -> Path:
+def get_config_path(repo_root: Path | None = None, local: bool = True) -> Path:
     """Get the config file path for a repository.
 
     Args:
         repo_root: Repository root. If None, detects from current directory.
+        local: If True, return path to local config. If False, return path to project config.
 
     Returns:
         Path to the config file.
     """
     if repo_root is None:
         repo_root = get_repo_root()
-    return repo_root / CONFIG_DIR / CONFIG_FILENAME
+    filename = CONFIG_FILENAME_LOCAL if local else CONFIG_FILENAME_PROJECT
+    return repo_root / CONFIG_DIR / filename
+
+
+def config_exists(repo_root: Path | None = None) -> bool:
+    """Check if any config file exists (local or project).
+
+    Args:
+        repo_root: Repository root. If None, detects from current directory.
+
+    Returns:
+        True if either local or project config exists.
+    """
+    try:
+        if repo_root is None:
+            repo_root = get_repo_root()
+        local_path = repo_root / CONFIG_DIR / CONFIG_FILENAME_LOCAL
+        project_path = repo_root / CONFIG_DIR / CONFIG_FILENAME_PROJECT
+        return local_path.exists() or project_path.exists()
+    except RuntimeError:
+        # Not in a git repository
+        return False
 
 
 # Schema for documentation and wts config list
@@ -104,38 +127,55 @@ class Config:
     init_script: str | None = None
 
     @classmethod
+    def _apply_file_config(cls, config: "Config", file_config: dict[str, Any]) -> None:
+        """Apply config values from a file config dict."""
+        if "worktree_base" in file_config:
+            config.worktree_base = Path(file_config["worktree_base"]).expanduser()
+        if "editor" in file_config:
+            config.editor = file_config["editor"]
+        if "terminal" in file_config:
+            config.terminal = file_config["terminal"]
+        if "terminal_mode" in file_config:
+            config.terminal_mode = file_config["terminal_mode"]
+        if "terminal_split" in file_config:
+            config.terminal_split = file_config["terminal_split"]
+        if "init_script" in file_config:
+            config.init_script = file_config["init_script"]
+
+    @classmethod
     def load(cls, repo_root: Path | None = None) -> "Config":
         """Load config from file, with env var overrides.
+
+        Loading precedence (later overrides earlier):
+        1. Default values
+        2. Project config (.wts/settings.yaml)
+        3. Local config (.wts/settings.local.yaml)
+        4. Environment variables
 
         Args:
             repo_root: Repository root path. If None, detects from current directory.
         """
         config = cls()
 
-        # Layer 1: Load from file if exists
         try:
-            config_path = get_config_path(repo_root)
-            if config_path.exists():
-                with open(config_path) as f:
+            # Layer 1: Load project config if exists (shared settings)
+            project_path = get_config_path(repo_root, local=False)
+            if project_path.exists():
+                with open(project_path) as f:
                     file_config = yaml.safe_load(f) or {}
+                cls._apply_file_config(config, file_config)
 
-                if "worktree_base" in file_config:
-                    config.worktree_base = Path(file_config["worktree_base"]).expanduser()
-                if "editor" in file_config:
-                    config.editor = file_config["editor"]
-                if "terminal" in file_config:
-                    config.terminal = file_config["terminal"]
-                if "terminal_mode" in file_config:
-                    config.terminal_mode = file_config["terminal_mode"]
-                if "terminal_split" in file_config:
-                    config.terminal_split = file_config["terminal_split"]
-                if "init_script" in file_config:
-                    config.init_script = file_config["init_script"]
+            # Layer 2: Load local config if exists (personal settings override project)
+            local_path = get_config_path(repo_root, local=True)
+            if local_path.exists():
+                with open(local_path) as f:
+                    file_config = yaml.safe_load(f) or {}
+                cls._apply_file_config(config, file_config)
         except RuntimeError:
             # Not in a git repository, use defaults
             pass
 
-        # Layer 2: Env vars override file
+        # Layer 3: Env vars override file
         if env_base := os.environ.get("WTS_WORKTREE_BASE"):
             config.worktree_base = Path(env_base).expanduser()
         if env_editor := os.environ.get("WTS_EDITOR"):
@@ -151,13 +191,14 @@ class Config:
 
         return config
 
-    def save(self, repo_root: Path | None = None) -> None:
+    def save(self, repo_root: Path | None = None, local: bool = True) -> None:
         """Save current config to file.
 
         Args:
             repo_root: Repository root path. If None, detects from current directory.
+            local: If True, save to local config. If False, save to project config.
         """
-        config_path = get_config_path(repo_root)
+        config_path = get_config_path(repo_root, local=local)
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
         data: dict[str, str] = {
@@ -197,15 +238,16 @@ def reset_config() -> None:
     _config = None
 
 
-def create_default_config(repo_root: Path | None = None) -> None:
-    """Create default config file if it doesn't exist.
+def create_default_config(repo_root: Path | None = None, local: bool = True) -> Path:
+    """Create default config file.
 
     Args:
         repo_root: Repository root path. If None, detects from current directory.
+        local: If True, create local config. If False, create project config.
+
+    Returns:
+        Path to the created config file.
     """
-    config_path = get_config_path(repo_root)
-    if not config_path.exists():
-        Config().save(repo_root)
-        print(f"Created default config at {config_path}")
-    else:
-        print(f"Config already exists at {config_path}")
+    config_path = get_config_path(repo_root, local=local)
+    Config().save(repo_root, local=local)
+    return config_path

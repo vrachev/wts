@@ -226,6 +226,6 @@ Thumbs.db
 *~
 
 # WTS Project specific
-.wts
+.wts/*.local.yaml
 .wts-status
 .ready-for-review

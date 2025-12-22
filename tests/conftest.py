@@ -31,11 +31,30 @@ def isolate_wts_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture(autouse=True)
 def isolate_config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Use temporary config path to avoid writing to user's real config."""
+    import wts.cli.init
+    import wts.cli.main
     import wts.config
 
-    config_path = tmp_path / "config" / "wts" / "config.yaml"
-    monkeypatch.setattr(wts.config, "get_config_path", lambda repo_root=None: config_path)
-    return config_path
+    config_dir = tmp_path / "config" / "wts"
+
+    def mock_get_config_path(repo_root=None, local: bool = True):
+        filename = wts.config.CONFIG_FILENAME_LOCAL if local else wts.config.CONFIG_FILENAME_PROJECT
+        return config_dir / filename
+
+    def mock_config_exists(repo_root=None):
+        local_path = config_dir / wts.config.CONFIG_FILENAME_LOCAL
+        project_path = config_dir / wts.config.CONFIG_FILENAME_PROJECT
+        return local_path.exists() or project_path.exists()
+
+    # Patch in the config module
+    monkeypatch.setattr(wts.config, "get_config_path", mock_get_config_path)
+    monkeypatch.setattr(wts.config, "config_exists", mock_config_exists)
+
+    # Also patch in modules that import these functions directly
+    monkeypatch.setattr(wts.cli.init, "config_exists", mock_config_exists)
+    monkeypatch.setattr(wts.cli.main, "config_exists", mock_config_exists)
+
+    return config_dir
 
 
 @pytest.fixture
@@ -80,10 +99,19 @@ def tmp_git_repo(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def cli_runner(tmp_git_repo: Path, worktree_base_path: Path, monkeypatch: pytest.MonkeyPatch):
+def cli_runner(
+    tmp_git_repo: Path, worktree_base_path: Path, isolate_config_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     """CLI runner configured for test repository."""
     monkeypatch.chdir(tmp_git_repo)
     monkeypatch.setenv("WTS_WORKTREE_BASE", str(worktree_base_path))
+
+    # Pre-create config to skip auto-init for most tests
+    import wts.config
+
+    config_path = isolate_config_path / wts.config.CONFIG_FILENAME_LOCAL
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(f"worktree_base: {worktree_base_path}\n")
 
     class WtsCliRunner:
         """Wrapper around Click's CliRunner with simpler interface."""

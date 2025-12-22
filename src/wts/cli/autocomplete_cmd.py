@@ -7,9 +7,9 @@ import sys
 import click
 
 
-@click.command("completion")
+@click.command("autocomplete")
 @click.argument("shell", type=click.Choice(["bash", "zsh", "fish"]))
-def completion(shell: str) -> None:
+def autocomplete(shell: str) -> None:
     """Generate shell completion script.
 
     Output a script to enable shell completion for wts commands.
@@ -19,15 +19,15 @@ def completion(shell: str) -> None:
 
     \b
     Bash:
-      wts completion bash >> ~/.bashrc
+      wts autocomplete bash >> ~/.bashrc
 
     \b
     Zsh:
-      wts completion zsh >> ~/.zshrc
+      wts autocomplete zsh >> ~/.zshrc
 
     \b
     Fish:
-      wts completion fish > ~/.config/fish/completions/wts.fish
+      wts autocomplete fish > ~/.config/fish/completions/wts.fish
 
     \b
     After installation, restart your shell or source the config file.

@@ -2,8 +2,8 @@
 
 import click
 
+from wts.cli.autocomplete_cmd import autocomplete
 from wts.cli.complete import complete
-from wts.cli.completion_cmd import completion
 from wts.cli.config import config
 from wts.cli.create import create
 from wts.cli.delete import delete
@@ -34,8 +34,8 @@ def cli(ctx: click.Context) -> None:
         click.echo()  # Add blank line before command output
 
 
+cli.add_command(autocomplete)
 cli.add_command(complete)
-cli.add_command(completion)
 cli.add_command(config)
 cli.add_command(create)
 cli.add_command(delete)

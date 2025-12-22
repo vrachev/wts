@@ -2,6 +2,7 @@
 
 import click
 
+from wts.cli.completion import complete_worktree_names
 from wts.core.worktree import WorktreeManager
 from wts.exceptions import (
     InvalidWorktreeNameError,
@@ -12,7 +13,7 @@ from wts.exceptions import (
 
 
 @click.command()
-@click.argument("name")
+@click.argument("name", shell_complete=complete_worktree_names)
 @click.argument("message", required=False)
 @click.option(
     "--use-latest-msg",

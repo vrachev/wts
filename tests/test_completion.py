@@ -103,12 +103,12 @@ def test_completion_returns_empty_when_no_worktrees(
 
 
 @pytest.mark.e2e
-def test_completion_command_generates_bash_script(
+def test_autocomplete_command_generates_bash_script(
     tmp_git_repo: Path,
     cli_runner,
 ) -> None:
-    """Test that 'wts completion bash' generates a bash script."""
-    result = cli_runner.invoke(["completion", "bash"])
+    """Test that 'wts autocomplete bash' generates a bash script."""
+    result = cli_runner.invoke(["autocomplete", "bash"])
 
     assert result.exit_code == 0
     # Bash completion scripts contain _wts_completion function or complete builtin
@@ -116,12 +116,12 @@ def test_completion_command_generates_bash_script(
 
 
 @pytest.mark.e2e
-def test_completion_command_generates_zsh_script(
+def test_autocomplete_command_generates_zsh_script(
     tmp_git_repo: Path,
     cli_runner,
 ) -> None:
-    """Test that 'wts completion zsh' generates a zsh script."""
-    result = cli_runner.invoke(["completion", "zsh"])
+    """Test that 'wts autocomplete zsh' generates a zsh script."""
+    result = cli_runner.invoke(["autocomplete", "zsh"])
 
     assert result.exit_code == 0
     # Zsh completion scripts use compdef or define _wts function
@@ -129,12 +129,12 @@ def test_completion_command_generates_zsh_script(
 
 
 @pytest.mark.e2e
-def test_completion_command_generates_fish_script(
+def test_autocomplete_command_generates_fish_script(
     tmp_git_repo: Path,
     cli_runner,
 ) -> None:
-    """Test that 'wts completion fish' generates a fish script."""
-    result = cli_runner.invoke(["completion", "fish"])
+    """Test that 'wts autocomplete fish' generates a fish script."""
+    result = cli_runner.invoke(["autocomplete", "fish"])
 
     assert result.exit_code == 0
     # Fish completion scripts use 'complete' command
@@ -142,11 +142,11 @@ def test_completion_command_generates_fish_script(
 
 
 @pytest.mark.e2e
-def test_completion_command_rejects_invalid_shell(
+def test_autocomplete_command_rejects_invalid_shell(
     tmp_git_repo: Path,
     cli_runner,
 ) -> None:
     """Test that invalid shell name is rejected."""
-    result = cli_runner.invoke(["completion", "powershell"])
+    result = cli_runner.invoke(["autocomplete", "powershell"])
 
     assert result.exit_code != 0

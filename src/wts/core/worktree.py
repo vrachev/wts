@@ -275,6 +275,7 @@ class WorktreeManager:
         into: str = "main",
         cleanup: bool = True,
         use_latest_msg: bool = False,
+        auto_resolve_claude: bool = False,
     ) -> None:
         """Squash merge a worktree branch into target branch.
 
@@ -284,6 +285,7 @@ class WorktreeManager:
             into: Target branch to merge into. Defaults to "main".
             cleanup: If True, delete worktree and branch after merge.
             use_latest_msg: If True, use the latest commit message from the branch.
+            auto_resolve_claude: If True, attempt to auto-resolve conflicts using Claude CLI.
 
         Raises:
             InvalidWorktreeNameError: If the name is invalid.
@@ -330,7 +332,11 @@ class WorktreeManager:
                 check=True,
                 capture_output=True,
             )
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
+            # Capture error details before aborting
+            error_details = e.stderr.decode() if e.stderr else str(e)
+
+            # Abort the failed merge
             subprocess.run(
                 ["git", "merge", "--abort"],
                 cwd=self.repo_path,
@@ -341,7 +347,62 @@ class WorktreeManager:
                 cwd=self.repo_path,
                 capture_output=True,
             )
-            raise MergeConflictError(f"Squash merge failed for '{name}' into '{into}'")
+
+            if not auto_resolve_claude:
+                raise MergeConflictError(f"Squash merge failed for '{name}' into '{into}':\n{error_details}")
+
+            # Try rebase in worktree
+            try:
+                subprocess.run(
+                    ["git", "fetch", "origin", into],
+                    cwd=worktree_path,
+                    check=True,
+                    capture_output=True,
+                )
+                subprocess.run(
+                    ["git", "rebase", f"origin/{into}"],
+                    cwd=worktree_path,
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError:
+                # Rebase failed, call Claude to resolve
+                subprocess.run(
+                    ["git", "rebase", "--abort"],
+                    cwd=worktree_path,
+                    capture_output=True,
+                )
+                subprocess.run(
+                    [
+                        "claude",
+                        "--print",
+                        "-p",
+                        f"Rebase this branch onto origin/{into} and resolve any conflicts. "
+                        f"Keep the changes from this branch's commit: {message}",
+                    ],
+                    cwd=worktree_path,
+                    check=True,
+                )
+
+            # Retry the squash merge
+            subprocess.run(
+                ["git", "checkout", into],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "merge", "--squash", name],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", message],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+            )
 
         if cleanup:
             self.delete(name, keep_branch=False)

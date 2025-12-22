@@ -31,7 +31,14 @@ from wts.exceptions import (
     default="main",
     help="Target branch to merge into (default: main)",
 )
-def complete(name: str, message: str | None, use_latest_msg: bool, no_cleanup: bool, into: str) -> None:
+@click.option(
+    "--auto-resolve-claude",
+    is_flag=True,
+    help="Auto-resolve conflicts using Claude CLI (requires claude to be installed)",
+)
+def complete(
+    name: str, message: str | None, use_latest_msg: bool, no_cleanup: bool, into: str, auto_resolve_claude: bool
+) -> None:
     """Squash merge worktree NAME into target branch with MESSAGE.
 
     Performs a squash merge of the worktree's branch into the target branch
@@ -53,7 +60,14 @@ def complete(name: str, message: str | None, use_latest_msg: bool, no_cleanup: b
         raise click.ClickException("Must specify either MESSAGE or --use-latest-msg")
     try:
         manager = WorktreeManager()
-        manager.complete(name, message, into=into, cleanup=not no_cleanup, use_latest_msg=use_latest_msg)
+        manager.complete(
+            name,
+            message,
+            into=into,
+            cleanup=not no_cleanup,
+            use_latest_msg=use_latest_msg,
+            auto_resolve_claude=auto_resolve_claude,
+        )
         if no_cleanup:
             click.echo(f"Merged worktree '{name}' into '{into}'")
         else:

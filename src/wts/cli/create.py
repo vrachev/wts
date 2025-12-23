@@ -20,8 +20,10 @@ from wts.exceptions import (
 @click.option(
     "--editor",
     "-e",
+    is_flag=False,
+    flag_value="default",
     default=None,
-    help="Open in editor (--editor=default uses WTS_EDITOR, or specify: --editor=cursor)",
+    help="Open in editor (-e uses default, -e=cursor for specific)",
 )
 @click.option("--no-init", is_flag=True, help="Skip running the init script")
 def create(name: str, from_current: bool, terminal: bool, editor: str | None, no_init: bool) -> None:

@@ -143,3 +143,74 @@ def test_create_worktree_with_terminal_flag(
 
     worktree_path = worktree_base_path / repo_name / "feature-terminal"
     assert worktree_path.exists(), f"Worktree path does not exist: {worktree_path}"
+
+
+@pytest.mark.e2e
+def test_create_worktree_runs_init_script(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that init script runs and output is displayed."""
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "echo 'Hello from init script'")
+
+    result = cli_runner.invoke(["create", "feature-init"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Running init script..." in result.output
+    assert "Hello from init script" in result.output
+    assert "Init script completed successfully" in result.output
+
+
+@pytest.mark.e2e
+def test_create_worktree_init_script_failure(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that init script failure is reported with exit code."""
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "exit 1")
+
+    result = cli_runner.invoke(["create", "feature-init-fail"])
+
+    # Worktree should still be created even if init script fails
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Running init script..." in result.output
+    assert "Warning: init script failed with exit code 1" in result.output
+
+
+@pytest.mark.e2e
+def test_create_worktree_no_init_flag_skips_init_script(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that --no-init flag skips the init script."""
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "echo 'Should not run'")
+
+    result = cli_runner.invoke(["create", "feature-no-init", "--no-init"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Running init script..." not in result.output
+    assert "Should not run" not in result.output
+
+
+@pytest.mark.e2e
+def test_create_worktree_init_script_uses_bash(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that init script uses bash (supports bash-specific commands like source)."""
+    # Use a bash-specific feature: source command
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "source /dev/null && echo 'bash works'")
+
+    result = cli_runner.invoke(["create", "feature-bash"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "bash works" in result.output
+    assert "Init script completed successfully" in result.output

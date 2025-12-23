@@ -94,19 +94,31 @@ class WorktreeManager:
         Returns:
             True if script succeeded, False otherwise.
         """
+        print("Running init script...")
         try:
-            result = subprocess.run(
-                script,
-                shell=True,
+            # Use Popen for real-time output streaming
+            # Use bash explicitly to support bash-specific commands like 'source'
+            process = subprocess.Popen(
+                ["bash", "-c", script],
                 cwd=worktree_path,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Merge stderr into stdout for unified output
                 text=True,
+                bufsize=1,  # Line buffered
             )
-            if result.returncode != 0:
-                print(f"Warning: init script failed with exit code {result.returncode}", file=sys.stderr)
-                if result.stderr:
-                    print(result.stderr, file=sys.stderr)
+
+            # Stream output in real-time
+            if process.stdout:
+                for line in process.stdout:
+                    print(line, end="")
+
+            process.wait()
+
+            if process.returncode != 0:
+                print(f"Warning: init script failed with exit code {process.returncode}", file=sys.stderr)
                 return False
+
+            print("Init script completed successfully")
             return True
         except Exception as e:
             print(f"Warning: init script failed: {e}", file=sys.stderr)

@@ -202,3 +202,153 @@ def test_create_worktree_with_terminal_split_horizontal(
     # tmux uses -v for horizontal (stacked panes)
     assert "-v" in call_args
     assert str(worktree_path) in call_args
+
+
+# Tests for init script in new terminal
+
+
+@pytest.mark.e2e
+def test_create_worktree_with_terminal_runs_init_in_terminal(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that -t flag runs init script in the new terminal."""
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "echo 'init running'")
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-t-init", "-t"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    # Init should NOT run in parent terminal
+    assert "Running init script..." not in result.output
+    assert "init running" not in result.output
+
+    # Verify terminal command includes init script
+    call_args = mock_subprocess.run.call_args[0][0]
+    script = call_args[2]  # osascript -e SCRIPT
+    assert "echo 'init running'" in script
+
+
+@pytest.mark.e2e
+def test_create_worktree_with_terminal_and_editor_cursor(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that -t -e cursor runs init in new terminal, also opens cursor."""
+    import wts.core.editor as editor_module
+
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "npm install")
+
+    # Need to patch both terminal and editor subprocess
+    with (
+        patch.object(terminal_module, "subprocess") as mock_term_subprocess,
+        patch.object(editor_module, "subprocess") as mock_editor_subprocess,
+    ):
+        result = cli_runner.invoke(["create", "feature-t-e-cursor", "-t", "-e", "cursor"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    # Init should NOT run in parent
+    assert "Running init script..." not in result.output
+
+    # Terminal opened with init script
+    term_call = mock_term_subprocess.run.call_args[0][0]
+    assert "npm install" in term_call[2]
+
+    # Cursor also opened
+    editor_call = mock_editor_subprocess.run.call_args[0][0]
+    assert editor_call[0] == "cursor"
+
+
+@pytest.mark.e2e
+def test_create_worktree_with_terminal_no_init(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that --no-init -t opens terminal without init script."""
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "should not run")
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-no-init-t", "--no-init", "-t"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Running init script..." not in result.output
+
+    # Terminal command should NOT include init script
+    call_args = mock_subprocess.run.call_args[0][0]
+    script = call_args[2]
+    assert "should not run" not in script
+
+
+@pytest.mark.e2e
+def test_create_worktree_init_script_with_quotes_in_terminal(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that init scripts with quotes are properly escaped in terminal."""
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    monkeypatch.setenv("WTS_INIT_SCRIPT", 'echo "hello world"')
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-quotes", "-t"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    # Script should be properly escaped/included
+    call_args = mock_subprocess.run.call_args[0][0]
+    script = call_args[2]
+    # The script should contain the init command (may be escaped)
+    assert "echo" in script and "hello world" in script
+
+
+@pytest.mark.e2e
+def test_create_worktree_tmux_with_init_script(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that tmux properly handles init script in split command."""
+    monkeypatch.setenv("WTS_TERMINAL", "tmux")
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "make setup")
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-tmux-init", "-t"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    call_args = mock_subprocess.run.call_args[0][0]
+    # tmux split-window -h -c {path} {command}
+    assert call_args[0] == "tmux"
+    # Command should include init script
+    cmd_str = " ".join(call_args)
+    assert "make setup" in cmd_str
+
+
+@pytest.mark.e2e
+def test_create_worktree_terminal_without_init_configured(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test -t flag when no init script is configured."""
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    monkeypatch.delenv("WTS_INIT_SCRIPT", raising=False)
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-no-script", "-t"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    # Terminal should still open with just cd command
+    call_args = mock_subprocess.run.call_args[0][0]
+    script = call_args[2]
+    assert "cd " in script

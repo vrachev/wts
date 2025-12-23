@@ -124,6 +124,15 @@ class WorktreeManager:
             print(f"Warning: init script failed: {e}", file=sys.stderr)
             return False
 
+    def get_init_script(self) -> str | None:
+        """Get the init script command if configured.
+
+        Returns:
+            The init script command string, or None if not configured.
+        """
+        config = Config.load(self.repo_path)
+        return config.init_script
+
     def _is_git_worktree(self, name: str) -> bool:
         """Check if a worktree is registered with git."""
         worktree_path = self._get_worktree_path(name)

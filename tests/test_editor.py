@@ -238,3 +238,85 @@ def test_select_worktree_with_editor_claude(
     script = call_args[2]
     assert str(worktree_path) in script
     assert "claude" in script
+
+
+# Tests for init script behavior with editors
+
+
+@pytest.mark.e2e
+def test_create_worktree_with_editor_claude_runs_init_in_terminal(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that -e claude runs init script in terminal before claude."""
+    import wts.core.terminal as terminal_module
+
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "uv sync")
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-init-test", "-e", "claude"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    # Init should NOT run in parent terminal
+    assert "Running init script..." not in result.output
+
+    # Verify terminal command includes: cd, init script, then claude
+    call_args = mock_subprocess.run.call_args[0][0]
+    script = call_args[2]
+    assert "uv sync" in script
+    # Check the command chain is in the correct order: init_script && claude
+    assert "uv sync && claude" in script
+
+
+@pytest.mark.e2e
+def test_create_worktree_with_editor_cursor_runs_init_in_parent(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that -e cursor runs init in parent terminal (not new terminal)."""
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "echo 'parent init'")
+
+    with patch.object(editor_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-cursor-init", "-e", "cursor"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    # Init SHOULD run in parent terminal
+    assert "Running init script..." in result.output
+    assert "parent init" in result.output
+    assert "Init script completed successfully" in result.output
+
+    # Cursor should be opened
+    call_args = mock_subprocess.run.call_args[0][0]
+    assert call_args[0] == "cursor"
+
+
+@pytest.mark.e2e
+def test_create_worktree_with_terminal_and_editor_claude(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that -t -e claude runs init then claude in terminal (no duplicate terminal)."""
+    import wts.core.terminal as terminal_module
+
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "pip install -e .")
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-t-e-claude", "-t", "-e", "claude"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+
+    # Should only open ONE terminal (not two)
+    assert mock_subprocess.run.call_count == 1
+
+    call_args = mock_subprocess.run.call_args[0][0]
+    script = call_args[2]
+    assert "pip install -e ." in script
+    assert "claude" in script

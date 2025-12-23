@@ -24,6 +24,7 @@ def isolate_wts_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
         "WTS_TERMINAL",
         "WTS_TERMINAL_MODE",
         "WTS_TERMINAL_SPLIT",
+        "WTS_INIT_SCRIPT",
     ]:
         monkeypatch.delenv(var, raising=False)
 

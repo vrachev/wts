@@ -20,4 +20,4 @@ terminal_split: vertical
 
 # Shell command to run after creating a worktree
 # Env: WTS_INIT_SCRIPT
-# init_script:
+init_script: uv sync

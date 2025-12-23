@@ -9,6 +9,7 @@ from wts.config import Config
 from wts.exceptions import (
     InvalidWorktreeNameError,
     MergeConflictError,
+    RepoNotCleanError,
     WorktreeExistsError,
     WorktreeNotCleanError,
     WorktreeNotFoundError,
@@ -330,16 +331,22 @@ class WorktreeManager:
 
         assert message is not None, "Message must be provided or use_latest_msg must be True"
 
+        # Check if main repo is clean before attempting checkout
+        if not self._is_worktree_clean(self.repo_path):
+            raise RepoNotCleanError(
+                "Main repository has uncommitted changes or unmerged files. "
+                "Please run 'git status' to see the state and resolve before merging."
+            )
+
         original_branch = self._get_current_branch()
 
-        subprocess.run(
-            ["git", "checkout", into],
-            cwd=self.repo_path,
-            check=True,
-            capture_output=True,
-        )
-
         try:
+            subprocess.run(
+                ["git", "checkout", into],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+            )
             subprocess.run(
                 ["git", "merge", "--squash", name],
                 cwd=self.repo_path,
@@ -357,9 +364,15 @@ class WorktreeManager:
             # Capture error details before aborting
             error_details = e.stderr.decode() if e.stderr else str(e)
 
-            # Abort the failed merge
+            # Clean up the failed merge - reset to clean state
             subprocess.run(
                 ["git", "merge", "--abort"],
+                cwd=self.repo_path,
+                capture_output=True,
+            )
+            # Reset any uncommitted changes from the failed merge/checkout
+            subprocess.run(
+                ["git", "reset", "--hard", "HEAD"],
                 cwd=self.repo_path,
                 capture_output=True,
             )

@@ -7,6 +7,7 @@ from wts.core.worktree import WorktreeManager
 from wts.exceptions import (
     InvalidWorktreeNameError,
     MergeConflictError,
+    RepoNotCleanError,
     WorktreeNotCleanError,
     WorktreeNotFoundError,
 )
@@ -33,6 +34,7 @@ from wts.exceptions import (
 )
 @click.option(
     "--auto-resolve-claude",
+    "-a",
     is_flag=True,
     help="Auto-resolve conflicts using Claude CLI (requires claude to be installed)",
 )
@@ -77,6 +79,8 @@ def complete(
     except WorktreeNotFoundError as e:
         raise click.ClickException(str(e))
     except WorktreeNotCleanError as e:
+        raise click.ClickException(str(e))
+    except RepoNotCleanError as e:
         raise click.ClickException(str(e))
     except MergeConflictError as e:
         raise click.ClickException(str(e))

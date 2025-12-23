@@ -291,3 +291,40 @@ def test_complete_error_neither_message_nor_flag(
 
     assert result.exit_code != 0, "Expected non-zero exit code"
     assert "Must specify either" in result.output
+
+
+@pytest.mark.e2e
+def test_complete_main_repo_not_clean(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that completing fails when main repo has uncommitted changes."""
+    repo_name = tmp_git_repo.name
+    worktree_path = worktree_base_path / repo_name / "feature-main-dirty"
+
+    cli_runner.invoke(["create", "feature-main-dirty"])
+    _make_commit_in_worktree(worktree_path, "feature.txt", "feature content")
+
+    # Create uncommitted changes in main repo
+    (tmp_git_repo / "dirty.txt").write_text("uncommitted in main")
+
+    result = cli_runner.invoke(["complete", "feature-main-dirty", "Try to complete"])
+
+    assert result.exit_code != 0, "Expected non-zero exit code for dirty main repo"
+    assert (
+        "uncommitted" in result.output.lower() or "unmerged" in result.output.lower()
+    ), f"Expected error about uncommitted/unmerged files: {result.output}"
+
+
+@pytest.mark.e2e
+def test_complete_auto_resolve_short_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that -a short flag is recognized for --auto-resolve-claude."""
+    # Just verify the flag is recognized (we don't actually test Claude resolution)
+    result = cli_runner.invoke(["complete", "--help"])
+
+    assert "-a, --auto-resolve-claude" in result.output, f"Expected '-a' alias in help output: {result.output}"

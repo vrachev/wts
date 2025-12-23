@@ -47,3 +47,9 @@ class MergeConflictError(WtsError):
     """Raised when squash merge fails due to conflicts."""
 
     pass
+
+
+class RepoNotCleanError(WtsError):
+    """Raised when main repository has uncommitted changes or unmerged files."""
+
+    pass

@@ -4,7 +4,7 @@ worktree_base: ~/github/worktrees
 
 # Default editor (cursor, code, zed, subl)
 # Env: WTS_EDITOR
-# editor:
+editor: claude
 
 # Terminal override (iterm2, tmux, warp, terminal, none)
 # Env: WTS_TERMINAL

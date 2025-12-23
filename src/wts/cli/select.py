@@ -22,8 +22,7 @@ from wts.exceptions import (
     "-e",
     is_flag=False,
     flag_value="default",
-    default=None,
-    help="Open in editor (-e uses default, -e=cursor for specific)",
+    help="Open in editor (-e uses default, -e cursor for specific)",
 )
 def select(name: str, terminal: bool, editor: str | None) -> None:
     """Select an existing worktree with the given NAME."""

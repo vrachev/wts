@@ -135,6 +135,77 @@ def test_create_worktree_with_editor_claude(
 
 
 @pytest.mark.e2e
+def test_create_worktree_with_bare_editor_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that bare -e flag (without value) uses the default editor from config."""
+    monkeypatch.setenv("WTS_EDITOR", "cursor")
+    repo_name = tmp_git_repo.name
+
+    with patch.object(editor_module, "subprocess") as mock_subprocess:
+        # Key: using just "-e" without any value
+        result = cli_runner.invoke(["create", "feature-bare-e", "-e"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Created worktree" in result.output
+
+    worktree_path = worktree_base_path / repo_name / "feature-bare-e"
+    assert worktree_path.exists()
+
+    call_args = mock_subprocess.run.call_args[0][0]
+    assert call_args[0] == "cursor"  # Should use the configured editor
+
+
+@pytest.mark.e2e
+def test_create_worktree_with_bare_editor_long_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that bare --editor flag (without value) uses the default editor."""
+    monkeypatch.setenv("WTS_EDITOR", "zed")
+    repo_name = tmp_git_repo.name
+
+    with patch.object(editor_module, "subprocess") as mock_subprocess:
+        # Key: using just "--editor" without any value
+        result = cli_runner.invoke(["create", "feature-bare-editor", "--editor"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+
+    worktree_path = worktree_base_path / repo_name / "feature-bare-editor"
+    assert worktree_path.exists()
+
+    call_args = mock_subprocess.run.call_args[0][0]
+    assert call_args[0] == "zed"
+
+
+@pytest.mark.e2e
+def test_select_worktree_with_bare_editor_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that select command with bare -e flag works."""
+    monkeypatch.setenv("WTS_EDITOR", "code")
+
+    # First create the worktree
+    result = cli_runner.invoke(["create", "feature-select-bare-e"])
+    assert result.exit_code == 0
+
+    with patch.object(editor_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["select", "feature-select-bare-e", "-e"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    call_args = mock_subprocess.run.call_args[0][0]
+    assert call_args[0] == "code"
+
+
+@pytest.mark.e2e
 def test_select_worktree_with_editor_claude(
     tmp_git_repo: Path,
     cli_runner,

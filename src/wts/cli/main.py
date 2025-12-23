@@ -2,7 +2,7 @@
 
 import click
 
-from wts.cli.autocomplete_cmd import autocomplete
+from wts.cli.autocomplete import autocomplete
 from wts.cli.complete import complete
 from wts.cli.config import config
 from wts.cli.create import create
@@ -13,7 +13,7 @@ from wts.cli.select import select
 from wts.config import config_exists
 
 # Commands that should skip auto-initialization
-SKIP_INIT_COMMANDS = {"init", "completion"}
+SKIP_INIT_COMMANDS = {"init", "autocomplete"}
 
 
 @click.group()

@@ -57,7 +57,7 @@ def complete(
     if message and use_latest_msg:
         raise click.ClickException("Cannot specify both MESSAGE and --use-latest-msg")
     if not message and not use_latest_msg:
-        raise click.ClickException("Must specify either MESSAGE or --use-latest-msg")
+        raise click.ClickException("Must specify either MESSAGE or --use-latest-msg or -l")
     try:
         manager = WorktreeManager()
         manager.complete(

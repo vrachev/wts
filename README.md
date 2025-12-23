@@ -41,19 +41,19 @@ Enable tab completion for commands, flags, and worktree names.
 
 **Zsh:**
 ```bash
-wts completion zsh >> ~/.zshrc
+wts autocomplete zsh >> ~/.zshrc
 source ~/.zshrc
 ```
 
 **Bash:**
 ```bash
-wts completion bash >> ~/.bashrc
+wts autocomplete bash >> ~/.bashrc
 source ~/.bashrc
 ```
 
 **Fish:**
 ```bash
-wts completion fish > ~/.config/fish/completions/wts.fish
+wts autocomplete fish > ~/.config/fish/completions/wts.fish
 ```
 
 ## Development

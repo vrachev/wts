@@ -94,14 +94,14 @@ def test_auto_init_skipped_for_init_command(cli_runner, isolate_config_path: Pat
     assert result.output.count("Where should WTS store configuration?") == 1
 
 
-def test_auto_init_skipped_for_completion_command(cli_runner, isolate_config_path: Path) -> None:
-    """Test that completion command doesn't trigger auto-init."""
+def test_auto_init_skipped_for_autocomplete_command(cli_runner, isolate_config_path: Path) -> None:
+    """Test that autocomplete command doesn't trigger auto-init."""
     # Remove the pre-created config
     local_config = isolate_config_path / wts.config.CONFIG_FILENAME_LOCAL
     if local_config.exists():
         local_config.unlink()
 
-    result = cli_runner.invoke(["completion", "bash"])
+    result = cli_runner.invoke(["autocomplete", "bash"])
 
     # Should NOT prompt for init
     assert "WTS needs to be initialized" not in result.output

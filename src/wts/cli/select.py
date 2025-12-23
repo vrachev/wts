@@ -2,7 +2,7 @@
 
 import click
 
-from wts.cli.completion import complete_worktree_names
+from wts.cli.autocomplete import complete_worktree_names
 from wts.core.editor import open_editor
 from wts.core.terminal import open_terminal
 from wts.core.worktree import WorktreeManager

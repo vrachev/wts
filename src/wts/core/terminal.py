@@ -107,6 +107,7 @@ def _open_iterm2(path: Path, command: str | None = None) -> None:
                 set newSession to ({split_cmd} with default profile)
             end tell
             tell newSession
+                select
                 write text "{cmd_text}"
             end tell
         end tell

@@ -1,72 +1,42 @@
-# WTS - Worktree Management System
+# WTS - Git Worktree Manager
 
-CLI for managing git worktrees for parallel AI agent development.
+Run parallel AI agents on the same repo without conflicts.
 
-## Installation
-
-```bash
-git clone https://github.com/yourusername/wts.git
-cd wts
-uv tool install -e .
-```
-
-If `wts` command is not found, run `uv tool update-shell` and restart your shell.
-
-### Development Setup
+## Quick Start
 
 ```bash
-git clone https://github.com/yourusername/wts.git
-cd wts
-uv sync --extra dev
-uv run pre-commit install
+uv tool install -e .          # Install
+wts create feature-x          # Create worktree
+wts create task-y -e claude   # Create + open in Claude
+wts complete task-y -l        # Squash merge when done
 ```
 
-Use `uv run wts` to run the development version from your local source.
+## Commands
 
-## Usage
+| Command | Description |
+|---------|-------------|
+| `create NAME` | Create worktree (use `-t` for terminal, `-e` for editor) |
+| `complete NAME MSG` | Squash merge into main and cleanup |
+| `select NAME` | Open existing worktree |
+| `list` | Show all worktrees |
+| `delete NAME` | Remove worktree |
+| `config` | Manage settings |
+
+## Install
 
 ```bash
-# Create a worktree (branches from main)
-wts create feature-auth
-
-# Branch from current HEAD instead
-wts create feature-subtask --from-current
+git clone https://github.com/yourusername/wts.git && cd wts && uv tool install -e .
 ```
 
-Worktrees are created at `~/github/worktrees/{project}/{name}/` (override with `WTS_WORKTREE_BASE` env var).
-
-## Shell Completion
-
-Enable tab completion for commands, flags, and worktree names.
-
-**Zsh:**
-```bash
-wts autocomplete zsh >> ~/.zshrc
-source ~/.zshrc
-```
-
-**Bash:**
-```bash
-wts autocomplete bash >> ~/.bashrc
-source ~/.bashrc
-```
-
-**Fish:**
-```bash
-wts autocomplete fish > ~/.config/fish/completions/wts.fish
-```
+Shell completions: `wts autocomplete zsh >> ~/.zshrc`
 
 ## Development
 
-Run tests and linting with the project's virtual environment:
-
 ```bash
-uv run pytest tests/
-uv run pytest tests/ --cov=src/wts
-uv run pre-commit run --all-files
+uv sync --extra dev && uv run pre-commit install
+uv run wts        # Run from source
+uv run pytest     # Run tests
 ```
-
-To test your local changes, use `uv run wts` instead of the installed `wts` command.
 
 ## License
 

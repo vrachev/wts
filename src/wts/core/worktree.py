@@ -298,22 +298,24 @@ class WorktreeManager:
         cleanup: bool = True,
         use_latest_msg: bool = False,
         auto_resolve_claude: bool = False,
+        squash: bool = True,
     ) -> None:
-        """Squash merge a worktree branch into target branch.
+        """Merge a worktree branch into target branch.
 
         Args:
             name: Name of the worktree/branch to merge.
-            message: Commit message for the squash merge. Required unless use_latest_msg is True.
+            message: Commit message for squash merge. Required for squash merge unless use_latest_msg is True.
             into: Target branch to merge into. Defaults to "main".
             cleanup: If True, delete worktree and branch after merge.
             use_latest_msg: If True, use the latest commit message from the branch.
             auto_resolve_claude: If True, attempt to auto-resolve conflicts using Claude CLI.
+            squash: If True (default), perform squash merge. If False, perform regular merge.
 
         Raises:
             InvalidWorktreeNameError: If the name is invalid.
             WorktreeNotFoundError: If the worktree does not exist.
             WorktreeNotCleanError: If worktree has uncommitted changes.
-            MergeConflictError: If squash merge fails due to conflicts.
+            MergeConflictError: If merge fails due to conflicts.
         """
         self._validate_name(name)
 
@@ -326,10 +328,10 @@ class WorktreeManager:
                 f"Worktree '{name}' has uncommitted changes. " "Please commit or stash changes before merging."
             )
 
-        if use_latest_msg:
-            message = self._get_latest_commit_message(name)
-
-        assert message is not None, "Message must be provided or use_latest_msg must be True"
+        if squash:
+            if use_latest_msg:
+                message = self._get_latest_commit_message(name)
+            assert message is not None, "Message must be provided or use_latest_msg must be True for squash merge"
 
         # Check if main repo is clean before attempting checkout
         if not self._is_worktree_clean(self.repo_path):
@@ -347,19 +349,27 @@ class WorktreeManager:
                 check=True,
                 capture_output=True,
             )
-            subprocess.run(
-                ["git", "merge", "--squash", name],
-                cwd=self.repo_path,
-                check=True,
-                capture_output=True,
-            )
-
-            subprocess.run(
-                ["git", "commit", "-m", message],
-                cwd=self.repo_path,
-                check=True,
-                capture_output=True,
-            )
+            if squash:
+                assert message is not None
+                subprocess.run(
+                    ["git", "merge", "--squash", name],
+                    cwd=self.repo_path,
+                    check=True,
+                    capture_output=True,
+                )
+                subprocess.run(
+                    ["git", "commit", "-m", message],
+                    cwd=self.repo_path,
+                    check=True,
+                    capture_output=True,
+                )
+            else:
+                subprocess.run(
+                    ["git", "merge", name],
+                    cwd=self.repo_path,
+                    check=True,
+                    capture_output=True,
+                )
         except subprocess.CalledProcessError as e:
             # Capture error details before aborting
             error_details = e.stderr.decode() if e.stderr else str(e)
@@ -383,7 +393,8 @@ class WorktreeManager:
             )
 
             if not auto_resolve_claude:
-                raise MergeConflictError(f"Squash merge failed for '{name}' into '{into}':\n{error_details}")
+                merge_type = "Squash merge" if squash else "Merge"
+                raise MergeConflictError(f"{merge_type} failed for '{name}' into '{into}':\n{error_details}")
 
             # Try rebase in worktree
             try:
@@ -406,37 +417,48 @@ class WorktreeManager:
                     cwd=worktree_path,
                     capture_output=True,
                 )
+                prompt = f"Rebase this branch onto origin/{into} and resolve any conflicts."
+                if message:
+                    prompt += f" Keep the changes from this branch's commit: {message}"
                 subprocess.run(
                     [
                         "claude",
                         "--print",
                         "-p",
-                        f"Rebase this branch onto origin/{into} and resolve any conflicts. "
-                        f"Keep the changes from this branch's commit: {message}",
+                        prompt,
                     ],
                     cwd=worktree_path,
                     check=True,
                 )
 
-            # Retry the squash merge
+            # Retry the merge
             subprocess.run(
                 ["git", "checkout", into],
                 cwd=self.repo_path,
                 check=True,
                 capture_output=True,
             )
-            subprocess.run(
-                ["git", "merge", "--squash", name],
-                cwd=self.repo_path,
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ["git", "commit", "-m", message],
-                cwd=self.repo_path,
-                check=True,
-                capture_output=True,
-            )
+            if squash:
+                assert message is not None
+                subprocess.run(
+                    ["git", "merge", "--squash", name],
+                    cwd=self.repo_path,
+                    check=True,
+                    capture_output=True,
+                )
+                subprocess.run(
+                    ["git", "commit", "-m", message],
+                    cwd=self.repo_path,
+                    check=True,
+                    capture_output=True,
+                )
+            else:
+                subprocess.run(
+                    ["git", "merge", name],
+                    cwd=self.repo_path,
+                    check=True,
+                    capture_output=True,
+                )
 
         if cleanup:
             self.delete(name, keep_branch=False)

@@ -88,7 +88,7 @@ def test_complete_basic_squash_merge(
     result = cli_runner.invoke(["complete", "feature-squash", "Add feature"])
 
     assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
-    assert "Merged worktree" in result.output
+    assert "Squash merged worktree" in result.output
     assert "cleaned up" in result.output
 
     # Verify worktree is deleted
@@ -133,7 +133,7 @@ def test_complete_with_no_cleanup(
     result = cli_runner.invoke(["complete", "feature-keep", "Add keep feature", "--no-cleanup"])
 
     assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
-    assert "Merged worktree" in result.output
+    assert "Squash merged worktree" in result.output
     assert "cleaned up" not in result.output
 
     # Verify worktree still exists
@@ -221,7 +221,7 @@ def test_complete_use_latest_msg_flag(
     result = cli_runner.invoke(["complete", "feature-latest", "--use-latest-msg"])
 
     assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
-    assert "Merged worktree" in result.output
+    assert "Squash merged worktree" in result.output
 
     # Verify the commit message is the latest one
     git_log = subprocess.run(
@@ -328,3 +328,66 @@ def test_complete_auto_resolve_short_flag(
     result = cli_runner.invoke(["complete", "--help"])
 
     assert "-a, --auto-resolve-claude" in result.output, f"Expected '-a' alias in help output: {result.output}"
+
+
+@pytest.mark.e2e
+def test_complete_preserve_commits_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test regular merge with --preserve-commits flag preserves individual commits."""
+    repo_name = tmp_git_repo.name
+    worktree_path = worktree_base_path / repo_name / "feature-preserve"
+
+    cli_runner.invoke(["create", "feature-preserve"])
+    _make_commit_in_worktree(worktree_path, "file1.txt", "content1")
+    _make_commit_in_worktree(worktree_path, "file2.txt", "content2")
+
+    result = cli_runner.invoke(["complete", "feature-preserve", "--preserve-commits"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Merged worktree" in result.output
+    assert "Squash" not in result.output
+    assert "cleaned up" in result.output
+
+    # Verify both commits are preserved (not squashed into one)
+    git_log = subprocess.run(
+        ["git", "log", "--oneline", "-3"],
+        cwd=tmp_git_repo,
+        capture_output=True,
+        text=True,
+    )
+    assert "Add file1.txt" in git_log.stdout, f"Expected 'Add file1.txt' in: {git_log.stdout}"
+    assert "Add file2.txt" in git_log.stdout, f"Expected 'Add file2.txt' in: {git_log.stdout}"
+
+
+@pytest.mark.e2e
+def test_complete_preserve_commits_short_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that -p short flag is recognized for --preserve-commits."""
+    result = cli_runner.invoke(["complete", "--help"])
+
+    assert "-p, --preserve-commits" in result.output, f"Expected '-p' alias in help output: {result.output}"
+
+
+@pytest.mark.e2e
+def test_complete_preserve_commits_no_message_required(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that --preserve-commits does not require a message."""
+    repo_name = tmp_git_repo.name
+    worktree_path = worktree_base_path / repo_name / "feature-no-msg"
+
+    cli_runner.invoke(["create", "feature-no-msg"])
+    _make_commit_in_worktree(worktree_path, "file.txt", "content")
+
+    # Should succeed without message
+    result = cli_runner.invoke(["complete", "feature-no-msg", "-p"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"

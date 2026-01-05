@@ -1,4 +1,4 @@
-"""CLI command for completing (squash merging) worktrees."""
+"""CLI command for completing (merging) worktrees."""
 
 import click
 
@@ -38,13 +38,25 @@ from wts.exceptions import (
     is_flag=True,
     help="Auto-resolve conflicts using Claude CLI (requires claude to be installed)",
 )
+@click.option(
+    "--preserve-commits",
+    "-p",
+    is_flag=True,
+    help="Use regular merge instead of squash merge (preserves individual commits)",
+)
 def complete(
-    name: str, message: str | None, use_latest_msg: bool, no_cleanup: bool, into: str, auto_resolve_claude: bool
+    name: str,
+    message: str | None,
+    use_latest_msg: bool,
+    no_cleanup: bool,
+    into: str,
+    auto_resolve_claude: bool,
+    preserve_commits: bool,
 ) -> None:
-    """Squash merge worktree NAME into target branch with MESSAGE.
+    """Merge worktree NAME into target branch.
 
-    Performs a squash merge of the worktree's branch into the target branch
-    (default: main), then cleans up the worktree and branch by default.
+    By default, performs a squash merge requiring MESSAGE. Use --preserve-commits
+    for a regular merge that preserves individual commits (no message needed).
 
     Examples:
 
@@ -55,11 +67,14 @@ def complete(
         wts complete feature-api -l --into develop
 
         wts complete bugfix-123 "Fix login bug" --no-cleanup
+
+        wts complete feature-api --preserve-commits
     """
-    if message and use_latest_msg:
-        raise click.ClickException("Cannot specify both MESSAGE and --use-latest-msg")
-    if not message and not use_latest_msg:
-        raise click.ClickException("Must specify either MESSAGE or --use-latest-msg or -l")
+    if not preserve_commits:
+        if message and use_latest_msg:
+            raise click.ClickException("Cannot specify both MESSAGE and --use-latest-msg")
+        if not message and not use_latest_msg:
+            raise click.ClickException("Must specify either MESSAGE or --use-latest-msg or -l")
     try:
         manager = WorktreeManager()
         manager.complete(
@@ -69,11 +84,13 @@ def complete(
             cleanup=not no_cleanup,
             use_latest_msg=use_latest_msg,
             auto_resolve_claude=auto_resolve_claude,
+            squash=not preserve_commits,
         )
+        merge_type = "Merged" if preserve_commits else "Squash merged"
         if no_cleanup:
-            click.echo(f"Merged worktree '{name}' into '{into}'")
+            click.echo(f"{merge_type} worktree '{name}' into '{into}'")
         else:
-            click.echo(f"Merged worktree '{name}' into '{into}' and cleaned up")
+            click.echo(f"{merge_type} worktree '{name}' into '{into}' and cleaned up")
     except InvalidWorktreeNameError as e:
         raise click.ClickException(str(e))
     except WorktreeNotFoundError as e:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from wts.config import CONFIG_SCHEMA, Config, get_config, get_config_path
+from wts.config import CONFIG_SCHEMA, Config, get_active_config_path, get_config
 
 
 @click.group()
@@ -19,7 +19,7 @@ def config() -> None:
 def show() -> None:
     """Show current configuration."""
     cfg = get_config()
-    config_path = get_config_path()
+    config_path = get_active_config_path()
 
     click.echo(f"Config file: {config_path}")
     click.echo(f"  exists: {config_path.exists()}")
@@ -103,13 +103,13 @@ def list_options() -> None:
 @config.command("path")
 def show_path() -> None:
     """Show the config file path."""
-    click.echo(get_config_path())
+    click.echo(get_active_config_path())
 
 
 @config.command("edit")
 def edit_config() -> None:
     """Open config file in default editor."""
-    config_path = get_config_path()
+    config_path = get_active_config_path()
     # Create config file with defaults if it doesn't exist
     if not config_path.exists():
         Config().save()

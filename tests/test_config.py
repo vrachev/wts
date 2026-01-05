@@ -77,7 +77,8 @@ def test_config_save() -> None:
     config.editor = "zed"
     config.save()
 
-    assert wts.config.get_config_path().exists()
+    # When neither config exists, save() writes to project config
+    assert wts.config.get_config_path(local=False).exists()
     loaded = Config.load()
     assert loaded.editor == "zed"
 
@@ -87,7 +88,8 @@ def test_config_save_includes_all_settings() -> None:
     config = Config()
     config.save()
 
-    content = wts.config.get_config_path().read_text()
+    # When neither config exists, save() writes to project config
+    content = wts.config.get_config_path(local=False).read_text()
     # All settings are included
     assert "worktree_base:" in content
     assert "terminal_mode: split" in content
@@ -184,4 +186,105 @@ def test_config_cli_path(cli_runner) -> None:
     """Test wts config path command."""
     result = cli_runner.invoke(["config", "path"])
     assert result.exit_code == 0
+    # The cli_runner fixture creates settings.local.yaml, so that's what we expect
     assert "settings.local.yaml" in result.output
+
+
+def test_get_active_config_path_prefers_local(isolate_config_path: Path) -> None:
+    """Test that get_active_config_path returns local config when it exists."""
+    import wts.config
+
+    # Create both config files
+    local_path = isolate_config_path / wts.config.CONFIG_FILENAME_LOCAL
+    project_path = isolate_config_path / wts.config.CONFIG_FILENAME_PROJECT
+    isolate_config_path.mkdir(parents=True, exist_ok=True)
+    local_path.write_text("editor: local")
+    project_path.write_text("editor: project")
+
+    active_path = wts.config.get_active_config_path()
+    assert active_path == local_path
+
+
+def test_get_active_config_path_falls_back_to_project(isolate_config_path: Path) -> None:
+    """Test that get_active_config_path returns project config when local doesn't exist."""
+    import wts.config
+
+    # Create only project config
+    project_path = isolate_config_path / wts.config.CONFIG_FILENAME_PROJECT
+    isolate_config_path.mkdir(parents=True, exist_ok=True)
+    project_path.write_text("editor: project")
+
+    active_path = wts.config.get_active_config_path()
+    assert active_path == project_path
+
+
+def test_get_active_config_path_returns_project_when_neither_exists(isolate_config_path: Path) -> None:
+    """Test that get_active_config_path returns project path when neither exists."""
+    import wts.config
+
+    isolate_config_path.mkdir(parents=True, exist_ok=True)
+
+    active_path = wts.config.get_active_config_path()
+    assert active_path == isolate_config_path / wts.config.CONFIG_FILENAME_PROJECT
+
+
+def test_config_save_to_project_when_only_project_exists(isolate_config_path: Path) -> None:
+    """Test that save() writes to project config when only project config exists."""
+    import wts.config
+
+    # Create only project config
+    project_path = isolate_config_path / wts.config.CONFIG_FILENAME_PROJECT
+    local_path = isolate_config_path / wts.config.CONFIG_FILENAME_LOCAL
+    isolate_config_path.mkdir(parents=True, exist_ok=True)
+    project_path.write_text("editor: project")
+
+    # Save should update project config, not create local
+    config = Config()
+    config.editor = "updated"
+    config.save()
+
+    assert project_path.exists()
+    assert not local_path.exists()
+    assert "updated" in project_path.read_text()
+
+
+def test_config_save_to_local_when_local_exists(isolate_config_path: Path) -> None:
+    """Test that save() writes to local config when it exists."""
+    import wts.config
+
+    # Create both config files
+    project_path = isolate_config_path / wts.config.CONFIG_FILENAME_PROJECT
+    local_path = isolate_config_path / wts.config.CONFIG_FILENAME_LOCAL
+    isolate_config_path.mkdir(parents=True, exist_ok=True)
+    project_path.write_text("editor: project")
+    local_path.write_text("editor: local")
+
+    # Save should update local config
+    config = Config()
+    config.editor = "updated"
+    config.save()
+
+    assert "updated" in local_path.read_text()
+    # Project should remain unchanged
+    assert "project" in project_path.read_text()
+
+
+def test_config_set_updates_project_when_only_project_exists(isolate_config_path: Path, cli_runner) -> None:
+    """Test that config set updates project config when only project config exists."""
+    import wts.config
+
+    # Remove the local config created by cli_runner fixture, keep only project
+    project_path = isolate_config_path / wts.config.CONFIG_FILENAME_PROJECT
+    local_path = isolate_config_path / wts.config.CONFIG_FILENAME_LOCAL
+    local_path.unlink(missing_ok=True)
+    project_path.write_text("editor: project")
+
+    reset_config()
+
+    result = cli_runner.invoke(["config", "set", "editor", "updated"])
+    assert result.exit_code == 0
+
+    # Should update project config, not create local
+    assert project_path.exists()
+    assert not local_path.exists()
+    assert "updated" in project_path.read_text()

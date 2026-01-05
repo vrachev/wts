@@ -32,6 +32,7 @@ def isolate_wts_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture(autouse=True)
 def isolate_config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Use temporary config path to avoid writing to user's real config."""
+    import wts.cli.config
     import wts.cli.init
     import wts.cli.main
     import wts.config
@@ -42,6 +43,12 @@ def isolate_config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
         filename = wts.config.CONFIG_FILENAME_LOCAL if local else wts.config.CONFIG_FILENAME_PROJECT
         return config_dir / filename
 
+    def mock_get_active_config_path(repo_root=None):
+        local_path = config_dir / wts.config.CONFIG_FILENAME_LOCAL
+        if local_path.exists():
+            return local_path
+        return config_dir / wts.config.CONFIG_FILENAME_PROJECT
+
     def mock_config_exists(repo_root=None):
         local_path = config_dir / wts.config.CONFIG_FILENAME_LOCAL
         project_path = config_dir / wts.config.CONFIG_FILENAME_PROJECT
@@ -49,11 +56,13 @@ def isolate_config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
 
     # Patch in the config module
     monkeypatch.setattr(wts.config, "get_config_path", mock_get_config_path)
+    monkeypatch.setattr(wts.config, "get_active_config_path", mock_get_active_config_path)
     monkeypatch.setattr(wts.config, "config_exists", mock_config_exists)
 
     # Also patch in modules that import these functions directly
     monkeypatch.setattr(wts.cli.init, "config_exists", mock_config_exists)
     monkeypatch.setattr(wts.cli.main, "config_exists", mock_config_exists)
+    monkeypatch.setattr(wts.cli.config, "get_active_config_path", mock_get_active_config_path)
 
     return config_dir
 

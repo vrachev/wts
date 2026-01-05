@@ -54,6 +54,25 @@ def get_config_path(repo_root: Path | None = None, local: bool = True) -> Path:
     return repo_root / CONFIG_DIR / filename
 
 
+def get_active_config_path(repo_root: Path | None = None) -> Path:
+    """Get the path to the config file that should be used for read/write.
+
+    Returns the local config path if it exists, otherwise the project config path.
+
+    Args:
+        repo_root: Repository root. If None, detects from current directory.
+
+    Returns:
+        Path to the active config file.
+    """
+    if repo_root is None:
+        repo_root = get_repo_root()
+    local_path = repo_root / CONFIG_DIR / CONFIG_FILENAME_LOCAL
+    if local_path.exists():
+        return local_path
+    return repo_root / CONFIG_DIR / CONFIG_FILENAME_PROJECT
+
+
 def config_exists(repo_root: Path | None = None) -> bool:
     """Check if any config file exists (local or project).
 
@@ -208,13 +227,20 @@ class Config:
             return path_str
         return str(value)
 
-    def save(self, repo_root: Path | None = None, local: bool = True) -> None:
+    def save(self, repo_root: Path | None = None, local: bool | None = None) -> None:
         """Save current config to file with documentation comments.
 
         Args:
             repo_root: Repository root path. If None, detects from current directory.
             local: If True, save to local config. If False, save to project config.
+                   If None (default), auto-detect based on which config file exists.
         """
+        if local is None:
+            # Auto-detect: use local if it exists, otherwise project
+            if repo_root is None:
+                repo_root = get_repo_root()
+            local_path = get_config_path(repo_root, local=True)
+            local = local_path.exists()
         config_path = get_config_path(repo_root, local=local)
         config_path.parent.mkdir(parents=True, exist_ok=True)
 

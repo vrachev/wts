@@ -229,3 +229,5 @@ Thumbs.db
 .wts/*.local.yaml
 .wts-status
 .ready-for-review
+
+docs/

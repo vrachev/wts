@@ -1,5 +1,7 @@
 """CLI command for deleting worktrees."""
 
+import subprocess
+
 import click
 
 from wts.cli.autocomplete import complete_worktree_names
@@ -28,6 +30,10 @@ def delete(names: tuple[str, ...], keep_branch: bool, force: bool) -> None:
             has_errors = True
         except WorktreeNotFoundError as e:
             click.echo(f"Error: {e}", err=True)
+            has_errors = True
+        except subprocess.CalledProcessError as e:
+            error_msg = e.stderr.decode().strip() if e.stderr else f"Command failed with exit code {e.returncode}"
+            click.echo(f"Error deleting '{name}': {error_msg}", err=True)
             has_errors = True
 
     if has_errors:

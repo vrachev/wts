@@ -32,7 +32,12 @@ def delete(names: tuple[str, ...], keep_branch: bool, force: bool) -> None:
             click.echo(f"Error: {e}", err=True)
             has_errors = True
         except subprocess.CalledProcessError as e:
-            error_msg = e.stderr.decode().strip() if e.stderr else f"Command failed with exit code {e.returncode}"
+            # Handle both string and bytes stderr (run_git_command returns string)
+            if e.stderr:
+                error_msg = e.stderr if isinstance(e.stderr, str) else e.stderr.decode()
+                error_msg = error_msg.strip()
+            else:
+                error_msg = f"Command failed with exit code {e.returncode}"
             click.echo(f"Error deleting '{name}': {error_msg}", err=True)
             has_errors = True
 

@@ -34,8 +34,9 @@ def get_repo_root(cwd: Path | None = None) -> Path:
             check=True,
         )
         return Path(result.stdout.strip())
-    except subprocess.CalledProcessError:
-        raise RuntimeError("Not in a git repository")
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.strip() if e.stderr else "Not in a git repository"
+        raise RuntimeError(error_msg)
 
 
 def get_config_path(repo_root: Path | None = None, local: bool = True) -> Path:

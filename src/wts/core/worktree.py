@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from wts.config import Config
+from wts.core.git import run_git_command
 from wts.exceptions import (
     InvalidWorktreeNameError,
     MergeConflictError,
@@ -37,12 +38,10 @@ class WorktreeManager:
 
     def _get_repo_name(self) -> str:
         """Get the repository name from the git root directory."""
-        result = subprocess.run(
+        result = run_git_command(
             ["git", "rev-parse", "--show-toplevel"],
             cwd=self.repo_path,
-            capture_output=True,
             text=True,
-            check=True,
         )
         return Path(result.stdout.strip()).name
 
@@ -70,12 +69,14 @@ class WorktreeManager:
 
     def _branch_exists(self, branch_name: str) -> bool:
         """Check if a branch exists."""
-        result = subprocess.run(
+        result = run_git_command(
             ["git", "branch", "--list", branch_name],
             cwd=self.repo_path,
-            capture_output=True,
             text=True,
+            check=False,
         )
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to check if branch exists: {result.stderr}")
         return branch_name in result.stdout
 
     def _worktree_exists(self, name: str) -> bool:
@@ -137,12 +138,14 @@ class WorktreeManager:
     def _is_git_worktree(self, name: str) -> bool:
         """Check if a worktree is registered with git."""
         worktree_path = self._get_worktree_path(name)
-        result = subprocess.run(
+        result = run_git_command(
             ["git", "worktree", "list", "--porcelain"],
             cwd=self.repo_path,
-            capture_output=True,
             text=True,
+            check=False,
         )
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to list worktrees: {result.stderr}")
         for line in result.stdout.splitlines():
             if line.startswith("worktree "):
                 path = line[9:]  # Remove "worktree " prefix
@@ -181,11 +184,9 @@ class WorktreeManager:
         else:
             base_ref = "main"
 
-        subprocess.run(
+        run_git_command(
             ["git", "worktree", "add", "-b", name, str(worktree_path), base_ref],
             cwd=self.repo_path,
-            check=True,
-            capture_output=True,
         )
 
         # Run init script if configured
@@ -220,19 +221,15 @@ class WorktreeManager:
             cmd.append("--force")
         cmd.append(str(worktree_path))
 
-        subprocess.run(
+        run_git_command(
             cmd,
             cwd=self.repo_path,
-            check=True,
-            capture_output=True,
         )
 
         if not keep_branch:
-            subprocess.run(
+            run_git_command(
                 ["git", "branch", "-D", name],
                 cwd=self.repo_path,
-                check=True,
-                capture_output=True,
             )
 
     def list(self) -> list[str]:
@@ -255,13 +252,15 @@ class WorktreeManager:
         Returns:
             True if worktree is clean, False otherwise.
         """
-        result = subprocess.run(
+        result = run_git_command(
             ["git", "status", "--porcelain"],
             cwd=worktree_path,
-            capture_output=True,
             text=True,
+            check=False,
         )
-        return result.stdout.strip() == ""
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to check worktree status: {result.stderr}")
+        return str(result.stdout).strip() == ""
 
     def _get_current_branch(self) -> str:
         """Get the current branch name in the main repo.
@@ -269,14 +268,12 @@ class WorktreeManager:
         Returns:
             Current branch name.
         """
-        result = subprocess.run(
+        result = run_git_command(
             ["git", "branch", "--show-current"],
             cwd=self.repo_path,
-            capture_output=True,
             text=True,
-            check=True,
         )
-        return result.stdout.strip()
+        return str(result.stdout).strip()
 
     def _get_latest_commit_message(self, branch: str) -> str:
         """Get the latest commit message from a branch.
@@ -287,14 +284,12 @@ class WorktreeManager:
         Returns:
             The latest commit message.
         """
-        result = subprocess.run(
+        result = run_git_command(
             ["git", "log", "-1", "--format=%B", branch],
             cwd=self.repo_path,
-            capture_output=True,
             text=True,
-            check=True,
         )
-        return result.stdout.strip()
+        return str(result.stdout).strip()
 
     def complete(
         self,
@@ -349,54 +344,54 @@ class WorktreeManager:
         original_branch = self._get_current_branch()
 
         try:
-            subprocess.run(
+            run_git_command(
                 ["git", "checkout", into],
                 cwd=self.repo_path,
-                check=True,
-                capture_output=True,
             )
             if squash:
                 assert message is not None
-                subprocess.run(
+                run_git_command(
                     ["git", "merge", "--squash", name],
                     cwd=self.repo_path,
-                    check=True,
-                    capture_output=True,
                 )
-                subprocess.run(
+                run_git_command(
                     ["git", "commit", "-m", message],
                     cwd=self.repo_path,
-                    check=True,
-                    capture_output=True,
                 )
             else:
-                subprocess.run(
+                run_git_command(
                     ["git", "merge", name],
                     cwd=self.repo_path,
-                    check=True,
-                    capture_output=True,
                 )
         except subprocess.CalledProcessError as e:
-            # Capture error details before aborting
-            error_details = e.stderr.decode() if e.stderr else str(e)
+            # Error details are already in e.stderr from run_git_command
+            error_details = e.stderr if isinstance(e.stderr, str) else (e.stderr.decode() if e.stderr else str(e))
 
             # Clean up the failed merge - reset to clean state
-            subprocess.run(
+            abort_result = run_git_command(
                 ["git", "merge", "--abort"],
                 cwd=self.repo_path,
-                capture_output=True,
+                check=False,
             )
+            if abort_result.returncode != 0:
+                print(f"Warning: git merge --abort failed: {abort_result.stderr}", file=sys.stderr)
+
             # Reset any uncommitted changes from the failed merge/checkout
-            subprocess.run(
+            reset_result = run_git_command(
                 ["git", "reset", "--hard", "HEAD"],
                 cwd=self.repo_path,
-                capture_output=True,
+                check=False,
             )
-            subprocess.run(
+            if reset_result.returncode != 0:
+                print(f"Warning: git reset --hard HEAD failed: {reset_result.stderr}", file=sys.stderr)
+
+            checkout_result = run_git_command(
                 ["git", "checkout", original_branch],
                 cwd=self.repo_path,
-                capture_output=True,
+                check=False,
             )
+            if checkout_result.returncode != 0:
+                print(f"Warning: git checkout {original_branch} failed: {checkout_result.stderr}", file=sys.stderr)
 
             if not auto_resolve_claude:
                 merge_type = "Squash merge" if squash else "Merge"
@@ -404,25 +399,29 @@ class WorktreeManager:
 
             # Try rebase in worktree
             try:
-                subprocess.run(
+                run_git_command(
                     ["git", "fetch", "origin", into],
                     cwd=worktree_path,
-                    check=True,
-                    capture_output=True,
                 )
-                subprocess.run(
+                run_git_command(
                     ["git", "rebase", f"origin/{into}"],
                     cwd=worktree_path,
-                    check=True,
-                    capture_output=True,
                 )
-            except subprocess.CalledProcessError:
+            except subprocess.CalledProcessError as rebase_error:
                 # Rebase failed, call Claude to resolve
-                subprocess.run(
+                rebase_error_details = (
+                    rebase_error.stderr if isinstance(rebase_error.stderr, str) else str(rebase_error)
+                )
+                print(f"Rebase failed: {rebase_error_details}", file=sys.stderr)
+
+                abort_result = run_git_command(
                     ["git", "rebase", "--abort"],
                     cwd=worktree_path,
-                    capture_output=True,
+                    check=False,
                 )
+                if abort_result.returncode != 0:
+                    print(f"Warning: git rebase --abort failed: {abort_result.stderr}", file=sys.stderr)
+
                 prompt = f"Rebase this branch onto origin/{into} and resolve any conflicts."
                 if message:
                     prompt += f" Keep the changes from this branch's commit: {message}"
@@ -438,32 +437,24 @@ class WorktreeManager:
                 )
 
             # Retry the merge
-            subprocess.run(
+            run_git_command(
                 ["git", "checkout", into],
                 cwd=self.repo_path,
-                check=True,
-                capture_output=True,
             )
             if squash:
                 assert message is not None
-                subprocess.run(
+                run_git_command(
                     ["git", "merge", "--squash", name],
                     cwd=self.repo_path,
-                    check=True,
-                    capture_output=True,
                 )
-                subprocess.run(
+                run_git_command(
                     ["git", "commit", "-m", message],
                     cwd=self.repo_path,
-                    check=True,
-                    capture_output=True,
                 )
             else:
-                subprocess.run(
+                run_git_command(
                     ["git", "merge", name],
                     cwd=self.repo_path,
-                    check=True,
-                    capture_output=True,
                 )
 
         if cleanup:

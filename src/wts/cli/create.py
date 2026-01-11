@@ -1,5 +1,7 @@
 """CLI command for creating worktrees."""
 
+import subprocess
+
 import click
 
 from wts.core.editor import get_editor, open_editor
@@ -64,3 +66,6 @@ def create(name: str, from_current: bool, terminal: bool, editor: str | None, no
         raise click.ClickException(str(e))
     except UnsupportedEditorError as e:
         raise click.ClickException(str(e))
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr if isinstance(e.stderr, str) else (e.stderr.decode() if e.stderr else str(e))
+        raise click.ClickException(error_msg)

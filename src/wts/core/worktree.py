@@ -196,12 +196,13 @@ class WorktreeManager:
 
         return worktree_path
 
-    def delete(self, name: str, keep_branch: bool = False) -> None:
+    def delete(self, name: str, keep_branch: bool = False, force: bool = False) -> None:
         """Delete a worktree.
 
         Args:
             name: Name of the worktree to delete.
             keep_branch: If True, keep the branch after removing the worktree.
+            force: If True, force deletion even if worktree has modified/untracked files.
 
         Raises:
             InvalidWorktreeNameError: If the name is invalid.
@@ -214,8 +215,13 @@ class WorktreeManager:
 
         worktree_path = self._get_worktree_path(name)
 
+        cmd = ["git", "worktree", "remove"]
+        if force:
+            cmd.append("--force")
+        cmd.append(str(worktree_path))
+
         subprocess.run(
-            ["git", "worktree", "remove", str(worktree_path)],
+            cmd,
             cwd=self.repo_path,
             check=True,
             capture_output=True,

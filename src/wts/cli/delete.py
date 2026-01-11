@@ -12,7 +12,7 @@ from wts.exceptions import InvalidWorktreeNameError, WorktreeNotFoundError
 @click.command()
 @click.argument("names", nargs=-1, required=True, shell_complete=complete_worktree_names)
 @click.option("--keep-branch", is_flag=True, help="Keep the branch after removing the worktree")
-@click.option("--force", "-f", is_flag=True, help="Skip confirmation prompt")
+@click.option("--force", "-f", is_flag=True, help="Force deletion even with modified/untracked files")
 def delete(names: tuple[str, ...], keep_branch: bool, force: bool) -> None:
     """Delete the worktree(s) with the given NAME(s)."""
     if not force:
@@ -23,7 +23,7 @@ def delete(names: tuple[str, ...], keep_branch: bool, force: bool) -> None:
     has_errors = False
     for name in names:
         try:
-            manager.delete(name, keep_branch=keep_branch)
+            manager.delete(name, keep_branch=keep_branch, force=force)
             click.echo(f"Deleted worktree '{name}'")
         except InvalidWorktreeNameError as e:
             click.echo(f"Error: {e}", err=True)

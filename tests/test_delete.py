@@ -197,3 +197,27 @@ def test_delete_best_effort_with_nonexistent(
     assert "not found" in result.output.lower()
     assert not exists_one_path.exists()
     assert not exists_two_path.exists()
+
+
+@pytest.mark.e2e
+def test_delete_force_with_untracked_files(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that --force deletes worktrees with untracked files."""
+    repo_name = tmp_git_repo.name
+    cli_runner.invoke(["create", "dirty-worktree"])
+    worktree_path = worktree_base_path / repo_name / "dirty-worktree"
+    assert worktree_path.exists()
+
+    # Create an untracked file in the worktree
+    (worktree_path / "untracked.txt").write_text("untracked content")
+
+    # Without --force, git worktree remove would fail, but -f skips confirmation
+    # and passes --force to git, so it should succeed
+    result = cli_runner.invoke(["delete", "-f", "dirty-worktree"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Deleted worktree" in result.output
+    assert not worktree_path.exists()

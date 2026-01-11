@@ -395,7 +395,13 @@ class WorktreeManager:
 
             if not auto_resolve_claude:
                 merge_type = "Squash merge" if squash else "Merge"
-                raise MergeConflictError(f"{merge_type} failed for '{name}' into '{into}':\n{error_details}")
+                error_msg = f"{merge_type} failed for '{name}' into '{into}':\n{error_details}"
+
+                # Add hint about auto-resolve flag if this is a merge conflict
+                if "CONFLICT" in error_details:
+                    error_msg += "\n\nTip: Use the -a flag to auto-resolve conflicts with Claude."
+
+                raise MergeConflictError(error_msg)
 
             # Try rebase in worktree
             try:

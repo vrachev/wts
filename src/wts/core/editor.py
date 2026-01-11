@@ -38,6 +38,13 @@ EDITOR_OPENERS: dict[str, Callable[[Path], None]] = {
     "claude": _open_claude_code,
 }
 
+TERMINAL_EDITORS = {"claude"}
+
+
+def is_terminal_editor(editor: str) -> bool:
+    """Return True if editor runs in a terminal (like claude)."""
+    return editor in TERMINAL_EDITORS
+
 
 def get_editor(override: str | None = None) -> str:
     """Get the editor to use.

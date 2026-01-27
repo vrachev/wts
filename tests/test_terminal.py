@@ -226,10 +226,10 @@ def test_create_worktree_with_terminal_runs_init_in_terminal(
     assert "Running init script..." not in result.output
     assert "init running" not in result.output
 
-    # Verify terminal command includes init script
+    # Verify terminal command includes init script (may be escaped for single quotes)
     call_args = mock_subprocess.run.call_args[0][0]
     script = call_args[2]  # osascript -e SCRIPT
-    assert "echo 'init running'" in script
+    assert "echo" in script and "init running" in script
 
 
 @pytest.mark.e2e

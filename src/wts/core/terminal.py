@@ -93,12 +93,18 @@ def open_terminal(path: Path, command: str | None = None, init_script: str | Non
         _open_terminal_app(path, command, init_script)
 
 
+def _escape_for_single_quotes(s: str) -> str:
+    """Escape a string for use inside single quotes in bash."""
+    # Replace ' with '\'' (end quote, escaped quote, start quote)
+    return s.replace("'", "'\\''")
+
+
 def _open_iterm2(path: Path, command: str | None = None, init_script: str | None = None) -> None:
     mode = _get_terminal_mode()
     cmd_text = _build_command_chain(path, init_script, command)
 
     if mode == "cd":
-        # Just cd in current session, no new split/tab
+        # Just cd in current session, no new split/tab - shell is already ready
         script = f"""
         tell application "iTerm2"
             tell current session of current window
@@ -107,28 +113,27 @@ def _open_iterm2(path: Path, command: str | None = None, init_script: str | None
         end tell
         """
     elif mode == "tab":
+        # Use command parameter to run reliably at session start
+        # Wrap in login shell to load user config, exec $SHELL keeps shell alive after
+        escaped_cmd = _escape_for_single_quotes(cmd_text)
+        shell_cmd = f"/bin/bash -l -c '{escaped_cmd}; exec $SHELL'"
         script = f"""
         tell application "iTerm2"
             tell current window
-                create tab with default profile
-                tell current session
-                    write text "{cmd_text}"
-                end tell
+                create tab with default profile command "{shell_cmd}"
             end tell
         end tell
         """
     else:
         direction = _get_split_direction()
         split_cmd = "split vertically" if direction == "vertical" else "split horizontally"
-        # Capture reference to new session and write to it directly
+        # Use command parameter to run reliably at session start
+        escaped_cmd = _escape_for_single_quotes(cmd_text)
+        shell_cmd = f"/bin/bash -l -c '{escaped_cmd}; exec $SHELL'"
         script = f"""
         tell application "iTerm2"
             tell current session of current window
-                set newSession to ({split_cmd} with default profile)
-            end tell
-            tell newSession
-                select
-                write text "{cmd_text}"
+                {split_cmd} with default profile command "{shell_cmd}"
             end tell
         end tell
         """

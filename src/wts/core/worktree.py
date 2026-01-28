@@ -431,16 +431,35 @@ class WorktreeManager:
                 prompt = f"Rebase this branch onto origin/{into} and resolve any conflicts."
                 if message:
                     prompt += f" Keep the changes from this branch's commit: {message}"
-                subprocess.run(
-                    [
-                        "claude",
-                        "--print",
-                        "-p",
-                        prompt,
-                    ],
+
+                # Inform user that Claude is starting
+                print("Attempting to auto-resolve conflicts with Claude...", file=sys.stderr)
+
+                # Stream Claude output in real-time (matching init script pattern)
+                process = subprocess.Popen(
+                    ["claude", "--print", "-p", prompt],
                     cwd=worktree_path,
-                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout for unified output
+                    text=True,
+                    bufsize=1,  # Line buffered
                 )
+
+                # Stream output in real-time so user sees progress
+                if process.stdout:
+                    for line in process.stdout:
+                        print(line, end="", file=sys.stderr)
+
+                process.wait()
+
+                if process.returncode != 0:
+                    raise MergeConflictError(
+                        "Claude failed to auto-resolve conflicts. "
+                        "This may be due to MCP plugin configuration issues. "
+                        "Try resolving conflicts manually or run 'claude' to check configuration."
+                    )
+
+                print("Claude successfully resolved conflicts", file=sys.stderr)
 
             # Retry the merge
             run_git_command(

@@ -447,6 +447,18 @@ class WorktreeManager:
                 ["git", "checkout", into],
                 cwd=self.repo_path,
             )
+            # Update local branch to match origin (since we rebased onto origin/{into})
+            try:
+                run_git_command(
+                    ["git", "pull", "--ff-only", "origin", into],
+                    cwd=self.repo_path,
+                )
+            except subprocess.CalledProcessError:
+                # Local branch has diverged from origin, reset to match
+                run_git_command(
+                    ["git", "reset", "--hard", f"origin/{into}"],
+                    cwd=self.repo_path,
+                )
             if squash:
                 assert message is not None
                 run_git_command(

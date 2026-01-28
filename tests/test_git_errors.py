@@ -148,3 +148,103 @@ def test_operations_outside_git_repo_shows_error(
     assert (
         "git" in output_lower or "repository" in output_lower or "error" in output_lower
     ), f"Expected git error message. Output: {result.output}"
+
+
+@pytest.mark.e2e
+def test_complete_autoresolve_updates_local_main_before_retry(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    tmp_path: Path,
+) -> None:
+    """Test that autoresolve updates local main to origin/main before retry merge.
+
+    This tests the scenario where:
+    1. A worktree branch modifies README.md
+    2. Local main also modifies README.md (creates conflict with initial merge)
+    3. origin/main is then reset to match worktree's expected state
+    4. Using -a flag should:
+       - Fail the initial merge (conflict with local main's README)
+       - Rebase worktree onto origin/main (succeeds)
+       - Update local main to origin/main before retry merge
+       - Successfully merge
+    """
+    repo_name = tmp_git_repo.name
+
+    # Create a bare repo to act as origin
+    origin_repo = tmp_path / "origin.git"
+    subprocess.run(["git", "clone", "--bare", str(tmp_git_repo), str(origin_repo)], check=True, capture_output=True)
+
+    # Add origin remote to test repo
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(origin_repo)], cwd=tmp_git_repo, check=True, capture_output=True
+    )
+
+    # Create a worktree that modifies README.md
+    cli_runner.invoke(["create", "feature-readme"])
+    worktree_path = worktree_base_path / repo_name / "feature-readme"
+
+    # Modify README.md in the worktree
+    (worktree_path / "README.md").write_text("# Feature Branch Changes\n")
+    subprocess.run(["git", "add", "."], cwd=worktree_path, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "modify readme in feature branch"],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
+    )
+
+    # Modify README.md DIFFERENTLY in local main (this creates the conflict)
+    (tmp_git_repo / "README.md").write_text("# Local Main Changes\n")
+    subprocess.run(["git", "add", "."], cwd=tmp_git_repo, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "modify readme in local main"],
+        cwd=tmp_git_repo,
+        check=True,
+        capture_output=True,
+    )
+
+    # Push local main to origin (so origin/main now has "Local Main Changes")
+    subprocess.run(["git", "push", "origin", "main"], cwd=tmp_git_repo, check=True, capture_output=True)
+
+    # Now from a clone, reset origin/main back to original state and add other.txt
+    # This simulates origin/main being in a state that the worktree can cleanly rebase onto
+    clone_path = tmp_path / "clone"
+    subprocess.run(["git", "clone", str(origin_repo), str(clone_path)], check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=clone_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=clone_path, check=True, capture_output=True)
+
+    # Reset README to original and add another file
+    (clone_path / "README.md").write_text("# Test Repository\n")  # Back to original
+    (clone_path / "other.txt").write_text("other content from origin\n")
+    subprocess.run(["git", "add", "."], cwd=clone_path, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "reset readme and add other file"],
+        cwd=clone_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "push", "-f", "origin", "main"], cwd=clone_path, check=True, capture_output=True)
+
+    # State:
+    # - local main: "# Local Main Changes" (diverged from origin)
+    # - origin/main: "# Test Repository" + other.txt (reset + new file)
+    # - worktree: "# Feature Branch Changes" (based on original "# Test Repository")
+    #
+    # Initial merge fails: worktree's README ("Feature") conflicts with local main's ("Local")
+    # Rebase succeeds: worktree's README change applies cleanly on origin's "# Test Repository"
+    # Without fix: retry merge fails because local main ("Local") != origin/main ("Test Repository")
+    # With fix: local main is updated to origin/main, then merge succeeds
+
+    # Use -a (autoresolve) and -l (use latest message)
+    result = cli_runner.invoke(["complete", "feature-readme", "-l", "-a"])
+
+    # This should succeed after the fix
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert "Squash merged worktree" in result.output
+
+    # Verify changes are on main
+    readme_content = (tmp_git_repo / "README.md").read_text()
+    assert "Feature Branch" in readme_content, f"Expected feature branch README. Content: {readme_content}"
+    # After updating local main from origin, other.txt should also be present
+    assert (tmp_git_repo / "other.txt").exists(), "other.txt should exist on main after pulling from origin"

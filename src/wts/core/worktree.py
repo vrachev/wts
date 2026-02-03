@@ -1,5 +1,6 @@
 """Worktree management core logic."""
 
+import os
 import re
 import subprocess
 import sys
@@ -98,10 +99,11 @@ class WorktreeManager:
         """
         print("Running init script...")
         try:
-            # Use Popen for real-time output streaming
-            # Use bash explicitly to support bash-specific commands like 'source'
+            # Use the user's default shell to ensure PATH and environment are fully loaded
+            # -l (login) loads .zprofile, -i (interactive) loads .zshrc where PATH is often set
+            user_shell = os.environ.get("SHELL", "/bin/bash")
             process = subprocess.Popen(
-                ["bash", "-c", script],
+                [user_shell, "-l", "-i", "-c", script],
                 cwd=worktree_path,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,  # Merge stderr into stdout for unified output

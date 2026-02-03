@@ -352,3 +352,92 @@ def test_create_worktree_terminal_without_init_configured(
     call_args = mock_subprocess.run.call_args[0][0]
     script = call_args[2]
     assert "cd " in script
+
+
+@pytest.mark.e2e
+def test_create_worktree_multiline_init_script_in_terminal(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that multi-line init scripts work in terminal."""
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    # Simulate YAML pipe syntax: newlines should be converted to semicolons
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "uv sync --extra dev\necho done")
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-multiline", "-t"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    call_args = mock_subprocess.run.call_args[0][0]
+    script = call_args[2]
+    # Should be joined with semicolons (not raw newlines between commands)
+    assert "uv sync --extra dev" in script
+    assert "echo done" in script
+    # Commands should be joined with semicolons, not separated by newlines
+    assert "uv sync --extra dev; echo done" in script
+
+
+@pytest.mark.e2e
+def test_create_worktree_dollar_sign_in_init_script(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that dollar signs pass through to shell."""
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "echo $PATH")
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-dollar", "-t"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    call_args = mock_subprocess.run.call_args[0][0]
+    script = call_args[2]
+    # Dollar sign should be present (not interpreted by AppleScript)
+    assert "$PATH" in script
+
+
+@pytest.mark.e2e
+def test_create_worktree_double_quotes_in_init_script(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that double quotes are properly escaped for AppleScript."""
+    monkeypatch.setenv("WTS_TERMINAL", "iterm2")
+    monkeypatch.setenv("WTS_INIT_SCRIPT", '/bin/bash -c "echo hello"')
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-dquotes", "-t"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    call_args = mock_subprocess.run.call_args[0][0]
+    script = call_args[2]
+    # Double quotes should be escaped with backslash in AppleScript
+    assert r"\"" in script or "echo hello" in script
+
+
+@pytest.mark.e2e
+def test_create_worktree_tmux_multiline_init_script(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that tmux handles multi-line init scripts."""
+    monkeypatch.setenv("WTS_TERMINAL", "tmux")
+    monkeypatch.setenv("WTS_INIT_SCRIPT", "uv sync\necho done")
+
+    with patch.object(terminal_module, "subprocess") as mock_subprocess:
+        result = cli_runner.invoke(["create", "feature-tmux-multiline", "-t"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    call_args = mock_subprocess.run.call_args[0][0]
+    cmd_str = " ".join(call_args)
+    # Should contain both commands, joined appropriately
+    assert "uv sync" in cmd_str
+    assert "echo done" in cmd_str

@@ -7,6 +7,11 @@ from pathlib import Path
 from wts.config import get_config
 
 
+def _get_user_shell() -> str:
+    """Get the user's default shell."""
+    return os.environ.get("SHELL", "/bin/bash")
+
+
 def detect_terminal() -> str:
     """Detect the current terminal application.
 
@@ -53,7 +58,9 @@ def _build_command_chain(path: Path, init_script: str | None, command: str | Non
     """
     parts = [f"cd {path}"]
     if init_script:
-        parts.append(init_script)
+        # Normalize multi-line scripts to single line
+        normalized = _normalize_multiline_script(init_script)
+        parts.append(normalized)
     if command:
         parts.append(command)
     return " && ".join(parts)
@@ -99,28 +106,70 @@ def _escape_for_single_quotes(s: str) -> str:
     return s.replace("'", "'\\''")
 
 
+def _normalize_multiline_script(script: str) -> str:
+    """Convert a multi-line script to a single-line command chain.
+
+    Args:
+        script: Script that may contain newlines
+
+    Returns:
+        Single-line script with commands joined by semicolons
+    """
+    if not script:
+        return script
+    # Split by newlines, strip whitespace, filter empty lines
+    lines = [line.strip() for line in script.split("\n")]
+    lines = [line for line in lines if line]
+    # Join with semicolons
+    return "; ".join(lines)
+
+
+def _escape_for_applescript(s: str) -> str:
+    """Escape a string for use inside AppleScript double-quoted strings.
+
+    AppleScript double-quoted strings only require escaping:
+    - Backslash (\\) -> \\\\
+    - Double quote (") -> \\"
+
+    Note: Dollar signs ($) pass through unchanged to the shell.
+
+    Args:
+        s: String to escape
+
+    Returns:
+        Escaped string safe for AppleScript double-quoted context
+    """
+    # Order matters: escape backslashes first, then quotes
+    s = s.replace("\\", "\\\\")
+    s = s.replace('"', '\\"')
+    return s
+
+
 def _open_iterm2(path: Path, command: str | None = None, init_script: str | None = None) -> None:
     mode = _get_terminal_mode()
     cmd_text = _build_command_chain(path, init_script, command)
 
     if mode == "cd":
         # Just cd in current session, no new split/tab - shell is already ready
+        escaped_cmd_text = _escape_for_applescript(cmd_text)
         script = f"""
         tell application "iTerm2"
             tell current session of current window
-                write text "{cmd_text}"
+                write text "{escaped_cmd_text}"
             end tell
         end tell
         """
     elif mode == "tab":
         # Use command parameter to run reliably at session start
-        # Wrap in login shell to load user config, exec $SHELL keeps shell alive after
+        # Wrap in user's login shell to load their config, exec $SHELL keeps shell alive after
+        user_shell = _get_user_shell()
         escaped_cmd = _escape_for_single_quotes(cmd_text)
-        shell_cmd = f"/bin/bash -l -c '{escaped_cmd}; exec $SHELL'"
+        shell_cmd = f"{user_shell} -l -i -c '{escaped_cmd}; exec $SHELL'"
+        escaped_shell_cmd = _escape_for_applescript(shell_cmd)
         script = f"""
         tell application "iTerm2"
             tell current window
-                create tab with default profile command "{shell_cmd}"
+                create tab with default profile command "{escaped_shell_cmd}"
             end tell
         end tell
         """
@@ -128,12 +177,14 @@ def _open_iterm2(path: Path, command: str | None = None, init_script: str | None
         direction = _get_split_direction()
         split_cmd = "split vertically" if direction == "vertical" else "split horizontally"
         # Use command parameter to run reliably at session start
+        user_shell = _get_user_shell()
         escaped_cmd = _escape_for_single_quotes(cmd_text)
-        shell_cmd = f"/bin/bash -l -c '{escaped_cmd}; exec $SHELL'"
+        shell_cmd = f"{user_shell} -l -i -c '{escaped_cmd}; exec $SHELL'"
+        escaped_shell_cmd = _escape_for_applescript(shell_cmd)
         script = f"""
         tell application "iTerm2"
             tell current session of current window
-                {split_cmd} with default profile command "{shell_cmd}"
+                {split_cmd} with default profile command "{escaped_shell_cmd}"
             end tell
         end tell
         """
@@ -143,12 +194,13 @@ def _open_iterm2(path: Path, command: str | None = None, init_script: str | None
 def _open_terminal_app(path: Path, command: str | None = None, init_script: str | None = None) -> None:
     mode = _get_terminal_mode()
     cmd_text = _build_command_chain(path, init_script, command)
+    escaped_cmd_text = _escape_for_applescript(cmd_text)
 
     if mode == "cd":
         # Just cd in current window
         script = f"""
         tell application "Terminal"
-            do script "{cmd_text}" in front window
+            do script "{escaped_cmd_text}" in front window
         end tell
         """
     else:
@@ -156,7 +208,7 @@ def _open_terminal_app(path: Path, command: str | None = None, init_script: str 
         script = f"""
         tell application "Terminal"
             activate
-            do script "{cmd_text}"
+            do script "{escaped_cmd_text}"
         end tell
         """
     subprocess.run(["osascript", "-e", script], check=True, capture_output=True)
@@ -172,8 +224,11 @@ def _open_tmux(path: Path, command: str | None = None, init_script: str | None =
         subprocess.run(["tmux", "send-keys", full_command, "Enter"], check=True, capture_output=True)
     elif mode == "tab":
         # tmux new-window runs command directly, so we need to wrap it
+        user_shell = _get_user_shell()
+        escaped_cmd = _escape_for_single_quotes(full_command)
+        shell_cmd = f"{user_shell} -l -i -c '{escaped_cmd}; exec $SHELL'"
         subprocess.run(
-            ["tmux", "new-window", "-c", str(path), f"bash -c '{full_command}; exec bash'"],
+            ["tmux", "new-window", "-c", str(path), shell_cmd],
             check=True,
             capture_output=True,
         )
@@ -182,8 +237,11 @@ def _open_tmux(path: Path, command: str | None = None, init_script: str | None =
         # tmux: -h splits horizontally (panes side by side), -v splits vertically (panes stacked)
         # This is opposite of iTerm2's naming, so we flip it to match user expectations
         split_flag = "-h" if direction == "vertical" else "-v"
+        user_shell = _get_user_shell()
+        escaped_cmd = _escape_for_single_quotes(full_command)
+        shell_cmd = f"{user_shell} -l -i -c '{escaped_cmd}; exec $SHELL'"
         subprocess.run(
-            ["tmux", "split-window", split_flag, "-c", str(path), f"bash -c '{full_command}; exec bash'"],
+            ["tmux", "split-window", split_flag, "-c", str(path), shell_cmd],
             check=True,
             capture_output=True,
         )
@@ -196,7 +254,9 @@ def _open_warp(path: Path, command: str | None = None, init_script: str | None =
     # Build the command chain (without cd since Warp opens in the path already)
     cmd_parts = []
     if init_script:
-        cmd_parts.append(init_script)
+        # Normalize multi-line scripts
+        normalized = _normalize_multiline_script(init_script)
+        cmd_parts.append(normalized)
     if command:
         cmd_parts.append(command)
 
@@ -205,11 +265,12 @@ def _open_warp(path: Path, command: str | None = None, init_script: str | None =
 
         time.sleep(0.5)  # Give Warp time to open
         full_cmd = " && ".join(cmd_parts)
+        escaped_full_cmd = _escape_for_applescript(full_cmd)
         script = f"""
         tell application "Warp"
             activate
             tell application "System Events"
-                keystroke "{full_cmd}"
+                keystroke "{escaped_full_cmd}"
                 key code 36
             end tell
         end tell

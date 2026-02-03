@@ -367,14 +367,23 @@ class WorktreeManager:
             # Error details are already in e.stderr from run_git_command
             error_details = e.stderr if isinstance(e.stderr, str) else (e.stderr.decode() if e.stderr else str(e))
 
-            # Clean up the failed merge - reset to clean state
-            abort_result = run_git_command(
-                ["git", "merge", "--abort"],
-                cwd=self.repo_path,
-                check=False,
-            )
-            if abort_result.returncode != 0:
-                print(f"Warning: git merge --abort failed: {abort_result.stderr}", file=sys.stderr)
+            # Always show error so user knows what went wrong
+            print(f"Merge/commit failed: {error_details}", file=sys.stderr)
+
+            # Check if this was a commit failure (merge succeeded) vs merge failure
+            # For squash merges, git merge --squash doesn't create MERGE_HEAD,
+            # so git merge --abort will fail if only the commit failed
+            is_commit_failure = "git commit" in str(e.cmd) if hasattr(e, "cmd") else False
+
+            # Only try merge abort if the merge itself failed (not the commit)
+            if not is_commit_failure:
+                abort_result = run_git_command(
+                    ["git", "merge", "--abort"],
+                    cwd=self.repo_path,
+                    check=False,
+                )
+                if abort_result.returncode != 0:
+                    print(f"Warning: git merge --abort failed: {abort_result.stderr}", file=sys.stderr)
 
             # Reset any uncommitted changes from the failed merge/checkout
             reset_result = run_git_command(
@@ -478,20 +487,27 @@ class WorktreeManager:
                     ["git", "reset", "--hard", f"origin/{into}"],
                     cwd=self.repo_path,
                 )
-            if squash:
-                assert message is not None
-                run_git_command(
-                    ["git", "merge", "--squash", name],
-                    cwd=self.repo_path,
-                )
-                run_git_command(
-                    ["git", "commit", "-m", message],
-                    cwd=self.repo_path,
-                )
-            else:
-                run_git_command(
-                    ["git", "merge", name],
-                    cwd=self.repo_path,
+            try:
+                if squash:
+                    assert message is not None
+                    run_git_command(
+                        ["git", "merge", "--squash", name],
+                        cwd=self.repo_path,
+                    )
+                    run_git_command(
+                        ["git", "commit", "-m", message],
+                        cwd=self.repo_path,
+                    )
+                else:
+                    run_git_command(
+                        ["git", "merge", name],
+                        cwd=self.repo_path,
+                    )
+            except subprocess.CalledProcessError as retry_error:
+                retry_details = retry_error.stderr if isinstance(retry_error.stderr, str) else str(retry_error)
+                raise MergeConflictError(
+                    f"Auto-resolve completed but merge still failed:\n{retry_details}\n"
+                    "The worktree may have been rebased successfully. Try completing manually."
                 )
 
         if cleanup:

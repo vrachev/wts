@@ -18,6 +18,19 @@ from wts.exceptions import (
 )
 
 
+def strip_coauthor_trailers(message: str) -> str:
+    """Strip Co-Authored-By trailers from a commit message.
+
+    Args:
+        message: The commit message potentially containing co-author trailers.
+
+    Returns:
+        The commit message with co-author trailers removed.
+    """
+    pattern = r"(?m)^Co-Authored-By:\s*.+<.+>\n?"
+    return re.sub(pattern, "", message, flags=re.IGNORECASE).rstrip()
+
+
 class WorktreeManager:
     """Manages git worktree operations."""
 
@@ -302,6 +315,7 @@ class WorktreeManager:
         use_latest_msg: bool = False,
         auto_resolve_claude: bool = False,
         squash: bool = True,
+        no_coauthor: bool = False,
     ) -> None:
         """Merge a worktree branch into target branch.
 
@@ -313,6 +327,7 @@ class WorktreeManager:
             use_latest_msg: If True, use the latest commit message from the branch.
             auto_resolve_claude: If True, attempt to auto-resolve conflicts using Claude CLI.
             squash: If True (default), perform squash merge. If False, perform regular merge.
+            no_coauthor: If True, strip Co-Authored-By trailers from messages and instruct Claude not to add them.
 
         Raises:
             InvalidWorktreeNameError: If the name is invalid.
@@ -334,6 +349,8 @@ class WorktreeManager:
         if squash:
             if use_latest_msg:
                 message = self._get_latest_commit_message(name)
+                if no_coauthor:
+                    message = strip_coauthor_trailers(message)
             assert message is not None, "Message must be provided or use_latest_msg must be True for squash merge"
 
         # Check if main repo is clean before attempting checkout
@@ -442,6 +459,10 @@ class WorktreeManager:
                 prompt = f"Rebase this branch onto origin/{into} and resolve any conflicts."
                 if message:
                     prompt += f" Keep the changes from this branch's commit: {message}"
+                if no_coauthor:
+                    prompt += (
+                        " IMPORTANT: Do NOT add any Co-Authored-By trailers or attribution lines to commit messages."
+                    )
 
                 # Inform user that Claude is starting
                 print("Attempting to auto-resolve conflicts with Claude...", file=sys.stderr)

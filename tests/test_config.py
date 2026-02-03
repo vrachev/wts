@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 import wts.config
-from wts.config import Config, get_config, reset_config
+from wts.config import CONFIG_SCHEMA, Config, get_config, maybe_update_config, reset_config
 
 
 def test_default_config() -> None:
@@ -288,3 +288,48 @@ def test_config_set_updates_project_when_only_project_exists(isolate_config_path
     assert project_path.exists()
     assert not local_path.exists()
     assert "updated" in project_path.read_text()
+
+
+def test_maybe_update_config_adds_missing_keys(isolate_config_path: Path) -> None:
+    """Test that maybe_update_config adds missing keys to existing config."""
+    import wts.config
+
+    # Create config with only some keys (simulating old config)
+    local_path = isolate_config_path / wts.config.CONFIG_FILENAME_LOCAL
+    isolate_config_path.mkdir(parents=True, exist_ok=True)
+    local_path.write_text("editor: cursor\nworktree_base: ~/worktrees")
+
+    reset_config()
+
+    # Should detect missing keys and update
+    updated = maybe_update_config()
+    assert updated is True
+
+    # Verify all schema keys are now present
+    content = local_path.read_text()
+    for key in CONFIG_SCHEMA.keys():
+        assert key in content, f"Missing key: {key}"
+
+    # Verify existing values are preserved
+    assert "cursor" in content
+
+
+def test_maybe_update_config_no_change_when_complete(isolate_config_path: Path) -> None:
+    """Test that maybe_update_config returns False when config is complete."""
+
+    # Create a complete config by saving defaults
+    isolate_config_path.mkdir(parents=True, exist_ok=True)
+    Config().save(local=True)
+
+    reset_config()
+
+    # Should not need to update
+    updated = maybe_update_config()
+    assert updated is False
+
+
+def test_maybe_update_config_returns_false_when_no_config() -> None:
+    """Test that maybe_update_config returns False when no config exists."""
+    # This test runs in a temp git repo with no config
+    updated = maybe_update_config()
+    assert updated is False

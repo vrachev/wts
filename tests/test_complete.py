@@ -391,3 +391,232 @@ def test_complete_preserve_commits_no_message_required(
     result = cli_runner.invoke(["complete", "feature-no-msg", "-p"])
 
     assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+
+
+@pytest.mark.e2e
+def test_complete_no_coauthor_short_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+) -> None:
+    """Test that -n short flag is recognized for --no-coauthor."""
+    result = cli_runner.invoke(["complete", "--help"])
+
+    assert "-n, --no-coauthor" in result.output, f"Expected '-n' alias in help output: {result.output}"
+
+
+@pytest.mark.e2e
+def test_complete_no_coauthor_strips_trailer_with_use_latest_msg(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that -n strips Co-Authored-By trailers when using -l."""
+    repo_name = tmp_git_repo.name
+    worktree_path = worktree_base_path / repo_name / "feature-coauthor"
+
+    cli_runner.invoke(["create", "feature-coauthor"])
+
+    # Create a commit with a Co-Authored-By trailer
+    (worktree_path / "file.txt").write_text("content")
+    subprocess.run(["git", "add", "."], cwd=worktree_path, check=True, capture_output=True)
+    commit_msg = "Add feature\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+    subprocess.run(
+        ["git", "commit", "-m", commit_msg],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
+    )
+
+    result = cli_runner.invoke(["complete", "feature-coauthor", "-l", "-n"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+
+    # Verify the commit message does NOT contain Co-Authored-By
+    git_log = subprocess.run(
+        ["git", "log", "-1", "--format=%B"],
+        cwd=tmp_git_repo,
+        capture_output=True,
+        text=True,
+    )
+    assert "Co-Authored-By" not in git_log.stdout, f"Expected no Co-Authored-By in: {git_log.stdout}"
+    assert "Add feature" in git_log.stdout, f"Expected 'Add feature' in: {git_log.stdout}"
+
+
+@pytest.mark.e2e
+def test_complete_preserves_coauthor_with_coauthor_flag(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that Co-Authored-By trailers are preserved with --coauthor flag."""
+    repo_name = tmp_git_repo.name
+    worktree_path = worktree_base_path / repo_name / "feature-keep-coauthor"
+
+    cli_runner.invoke(["create", "feature-keep-coauthor"])
+
+    # Create a commit with a Co-Authored-By trailer
+    (worktree_path / "file.txt").write_text("content")
+    subprocess.run(["git", "add", "."], cwd=worktree_path, check=True, capture_output=True)
+    commit_msg = "Add feature\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+    subprocess.run(
+        ["git", "commit", "-m", commit_msg],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
+    )
+
+    # Use --coauthor to explicitly preserve co-author (overrides default config)
+    result = cli_runner.invoke(["complete", "feature-keep-coauthor", "-l", "--coauthor"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+
+    # Verify the commit message DOES contain Co-Authored-By
+    git_log = subprocess.run(
+        ["git", "log", "-1", "--format=%B"],
+        cwd=tmp_git_repo,
+        capture_output=True,
+        text=True,
+    )
+    assert "Co-Authored-By" in git_log.stdout, f"Expected Co-Authored-By in: {git_log.stdout}"
+
+
+@pytest.mark.e2e
+def test_complete_no_coauthor_strips_multiple_trailers(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that -n strips multiple Co-Authored-By trailers."""
+    repo_name = tmp_git_repo.name
+    worktree_path = worktree_base_path / repo_name / "feature-multi-coauthor"
+
+    cli_runner.invoke(["create", "feature-multi-coauthor"])
+
+    # Create a commit with multiple Co-Authored-By trailers
+    (worktree_path / "file.txt").write_text("content")
+    subprocess.run(["git", "add", "."], cwd=worktree_path, check=True, capture_output=True)
+    commit_msg = """Add feature
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+Co-Authored-By: Another Author <author@example.com>"""
+    subprocess.run(
+        ["git", "commit", "-m", commit_msg],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
+    )
+
+    result = cli_runner.invoke(["complete", "feature-multi-coauthor", "-l", "-n"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+
+    # Verify no Co-Authored-By lines remain
+    git_log = subprocess.run(
+        ["git", "log", "-1", "--format=%B"],
+        cwd=tmp_git_repo,
+        capture_output=True,
+        text=True,
+    )
+    assert "Co-Authored-By" not in git_log.stdout, f"Expected no Co-Authored-By in: {git_log.stdout}"
+    assert "Add feature" in git_log.stdout
+
+
+@pytest.mark.e2e
+def test_complete_no_coauthor_with_explicit_message(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that -n flag is accepted with explicit message (no effect but no error)."""
+    repo_name = tmp_git_repo.name
+    worktree_path = worktree_base_path / repo_name / "feature-explicit-msg"
+
+    cli_runner.invoke(["create", "feature-explicit-msg"])
+    (worktree_path / "file.txt").write_text("content")
+    subprocess.run(["git", "add", "."], cwd=worktree_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Some commit"],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
+    )
+
+    # -n with explicit message should work (flag has no effect on explicit message)
+    result = cli_runner.invoke(["complete", "feature-explicit-msg", "Explicit message", "-n"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+
+
+@pytest.mark.e2e
+def test_complete_strips_coauthor_by_default(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that Co-Authored-By trailers are stripped by default (config default is true)."""
+    repo_name = tmp_git_repo.name
+    worktree_path = worktree_base_path / repo_name / "feature-default-strip"
+
+    cli_runner.invoke(["create", "feature-default-strip"])
+
+    # Create a commit with a Co-Authored-By trailer
+    (worktree_path / "file.txt").write_text("content")
+    subprocess.run(["git", "add", "."], cwd=worktree_path, check=True, capture_output=True)
+    commit_msg = "Add feature\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+    subprocess.run(
+        ["git", "commit", "-m", commit_msg],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
+    )
+
+    # No -n flag, but default config has no_coauthor=true
+    result = cli_runner.invoke(["complete", "feature-default-strip", "-l"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+
+    # Verify the commit message does NOT contain Co-Authored-By (stripped by default)
+    git_log = subprocess.run(
+        ["git", "log", "-1", "--format=%B"],
+        cwd=tmp_git_repo,
+        capture_output=True,
+        text=True,
+    )
+    assert "Co-Authored-By" not in git_log.stdout, f"Expected no Co-Authored-By in: {git_log.stdout}"
+    assert "Add feature" in git_log.stdout
+
+
+@pytest.mark.e2e
+def test_complete_no_coauthor_with_no_trailer_present(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that -n works correctly when no Co-Authored-By trailer is present."""
+    repo_name = tmp_git_repo.name
+    worktree_path = worktree_base_path / repo_name / "feature-no-trailer"
+
+    cli_runner.invoke(["create", "feature-no-trailer"])
+
+    # Create a commit WITHOUT a Co-Authored-By trailer
+    (worktree_path / "file.txt").write_text("content")
+    subprocess.run(["git", "add", "."], cwd=worktree_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Add feature without co-author"],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
+    )
+
+    result = cli_runner.invoke(["complete", "feature-no-trailer", "-l", "-n"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+
+    # Verify the commit message is preserved
+    git_log = subprocess.run(
+        ["git", "log", "-1", "--format=%B"],
+        cwd=tmp_git_repo,
+        capture_output=True,
+        text=True,
+    )
+    assert "Add feature without co-author" in git_log.stdout, f"Expected original message in: {git_log.stdout}"

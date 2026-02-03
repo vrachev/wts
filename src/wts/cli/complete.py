@@ -3,6 +3,7 @@
 import click
 
 from wts.cli.autocomplete import complete_worktree_names
+from wts.config import Config
 from wts.core.worktree import WorktreeManager
 from wts.exceptions import (
     InvalidWorktreeNameError,
@@ -44,6 +45,12 @@ from wts.exceptions import (
     is_flag=True,
     help="Use regular merge instead of squash merge (preserves individual commits)",
 )
+@click.option(
+    "--no-coauthor/--coauthor",
+    "-n",
+    default=None,
+    help="Strip Co-Authored-By trailers (default: from config, true if not set)",
+)
 def complete(
     name: str,
     message: str | None,
@@ -52,6 +59,7 @@ def complete(
     into: str,
     auto_resolve_claude: bool,
     preserve_commits: bool,
+    no_coauthor: bool | None,
 ) -> None:
     """Merge worktree NAME into target branch.
 
@@ -75,6 +83,12 @@ def complete(
             raise click.ClickException("Cannot specify both MESSAGE and --use-latest-msg")
         if not message and not use_latest_msg:
             raise click.ClickException("Must specify either MESSAGE or --use-latest-msg or -l")
+
+    # Resolve no_coauthor: CLI flag overrides config
+    if no_coauthor is None:
+        config = Config.load()
+        no_coauthor = config.no_coauthor
+
     try:
         manager = WorktreeManager()
         manager.complete(
@@ -85,6 +99,7 @@ def complete(
             use_latest_msg=use_latest_msg,
             auto_resolve_claude=auto_resolve_claude,
             squash=not preserve_commits,
+            no_coauthor=no_coauthor,
         )
         merge_type = "Merged" if preserve_commits else "Squash merged"
         if no_cleanup:

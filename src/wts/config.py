@@ -132,6 +132,12 @@ CONFIG_SCHEMA: dict[str, dict[str, str | None]] = {
         "env": "WTS_INIT_SCRIPT",
         "description": "Shell command to run after creating a worktree",
     },
+    "no_coauthor": {
+        "type": "bool",
+        "default": "true",
+        "env": "WTS_NO_COAUTHOR",
+        "description": "Strip Co-Authored-By trailers from commits (for wts complete -l/-a)",
+    },
 }
 
 
@@ -145,6 +151,7 @@ class Config:
     terminal_mode: Literal["split", "tab", "cd"] = "split"
     terminal_split: Literal["vertical", "horizontal"] = "vertical"
     init_script: str | None = None
+    no_coauthor: bool = True  # Strip Co-Authored-By trailers by default
 
     @classmethod
     def _apply_file_config(cls, config: "Config", file_config: dict[str, Any]) -> None:
@@ -161,6 +168,8 @@ class Config:
             config.terminal_split = file_config["terminal_split"]
         if "init_script" in file_config:
             config.init_script = file_config["init_script"]
+        if "no_coauthor" in file_config:
+            config.no_coauthor = bool(file_config["no_coauthor"])
 
     @classmethod
     def load(cls, repo_root: Path | None = None) -> "Config":
@@ -208,6 +217,8 @@ class Config:
             config.terminal_split = env_split  # type: ignore[assignment]
         if env_init := os.environ.get("WTS_INIT_SCRIPT"):
             config.init_script = env_init
+        if env_no_coauthor := os.environ.get("WTS_NO_COAUTHOR"):
+            config.no_coauthor = env_no_coauthor.lower() in ("true", "1", "yes")
 
         return config
 
@@ -226,7 +237,15 @@ class Config:
             if path_str.startswith(home):
                 return "~" + path_str[len(home) :]
             return path_str
-        return str(value)
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        str_value = str(value)
+        # Quote strings that contain special YAML characters or newlines
+        if "\n" in str_value or ":" in str_value or str_value.startswith('"'):
+            # Use double quotes and escape internal quotes/newlines
+            escaped = str_value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+            return f'"{escaped}"'
+        return str_value
 
     def save(self, repo_root: Path | None = None, local: bool | None = None) -> None:
         """Save current config to file with documentation comments.
@@ -298,3 +317,52 @@ def create_default_config(repo_root: Path | None = None, local: bool = True) -> 
     config_path = get_config_path(repo_root, local=local)
     Config().save(repo_root, local=local)
     return config_path
+
+
+def maybe_update_config(repo_root: Path | None = None) -> bool:
+    """Update config file if it's missing any keys from the schema.
+
+    This ensures that when new config options are added, existing config files
+    get updated to include them (with default values).
+
+    Args:
+        repo_root: Repository root path. If None, detects from current directory.
+
+    Returns:
+        True if config was updated, False if no update was needed.
+    """
+    try:
+        if repo_root is None:
+            repo_root = get_repo_root()
+
+        # Check both local and project config
+        local_path = get_config_path(repo_root, local=True)
+        project_path = get_config_path(repo_root, local=False)
+
+        updated = False
+
+        for config_path, is_local in [(local_path, True), (project_path, False)]:
+            if not config_path.exists():
+                continue
+
+            # Read raw file content to check for keys (including commented ones)
+            file_content = config_path.read_text()
+
+            # Check if any schema keys are missing from the file
+            # Keys can appear as "key:" or "# key:" (commented)
+            missing_keys = []
+            for key in CONFIG_SCHEMA.keys():
+                if f"{key}:" not in file_content and f"# {key}:" not in file_content:
+                    missing_keys.append(key)
+
+            if missing_keys:
+                # Load current config (preserves existing values) and re-save
+                # This will add missing keys with their defaults
+                config = Config.load(repo_root)
+                config.save(repo_root, local=is_local)
+                updated = True
+
+        return updated
+    except RuntimeError:
+        # Not in a git repository
+        return False

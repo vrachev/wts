@@ -9,6 +9,7 @@ from wts.core.terminal import open_terminal
 from wts.core.worktree import WorktreeManager
 from wts.exceptions import (
     EditorNotConfiguredError,
+    EmptyRepositoryError,
     InvalidWorktreeNameError,
     UnsupportedEditorError,
     WorktreeExistsError,
@@ -72,6 +73,8 @@ def create(name: str, from_current: bool, terminal: bool, editors: tuple[str, ..
     except InvalidWorktreeNameError as e:
         raise click.ClickException(str(e))
     except WorktreeExistsError as e:
+        raise click.ClickException(str(e))
+    except EmptyRepositoryError as e:
         raise click.ClickException(str(e))
     except EditorNotConfiguredError as e:
         raise click.ClickException(str(e))

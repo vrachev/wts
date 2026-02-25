@@ -53,3 +53,9 @@ class RepoNotCleanError(WtsError):
     """Raised when main repository has uncommitted changes or unmerged files."""
 
     pass
+
+
+class EmptyRepositoryError(WtsError):
+    """Raised when trying to create a worktree in a repository with no commits."""
+
+    pass

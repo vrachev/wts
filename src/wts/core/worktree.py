@@ -9,6 +9,7 @@ from pathlib import Path
 from wts.config import Config
 from wts.core.git import run_git_command
 from wts.exceptions import (
+    EmptyRepositoryError,
     InvalidWorktreeNameError,
     MergeConflictError,
     RepoNotCleanError,
@@ -168,6 +169,20 @@ class WorktreeManager:
                     return True
         return False
 
+    def _has_commits(self) -> bool:
+        """Check if the repository has any commits.
+
+        Returns:
+            True if the repository has at least one commit, False otherwise.
+        """
+        result = run_git_command(
+            ["git", "rev-parse", "HEAD"],
+            cwd=self.repo_path,
+            text=True,
+            check=False,
+        )
+        return result.returncode == 0
+
     def create(self, name: str, from_current: bool = False, run_init: bool = True) -> Path:
         """Create a new worktree.
 
@@ -184,6 +199,11 @@ class WorktreeManager:
             WorktreeExistsError: If a worktree with the name already exists.
         """
         self._validate_name(name)
+
+        if not self._has_commits():
+            raise EmptyRepositoryError(
+                "Cannot create worktree in a repository with no commits. " "Please make an initial commit first."
+            )
 
         if self._worktree_exists(name):
             raise WorktreeExistsError(f"Worktree '{name}' already exists")

@@ -6,6 +6,71 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture
+def tmp_empty_git_repo(tmp_path: Path) -> Path:
+    """Create temporary git repository with no commits."""
+    repo = tmp_path / "empty-repo"
+    repo.mkdir()
+
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+
+    return repo
+
+
+@pytest.fixture
+def empty_repo_cli_runner(
+    tmp_empty_git_repo: Path, worktree_base_path: Path, isolate_config_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """CLI runner configured for empty test repository (no commits)."""
+    monkeypatch.chdir(tmp_empty_git_repo)
+    monkeypatch.setenv("WTS_WORKTREE_BASE", str(worktree_base_path))
+
+    # Pre-create config to skip auto-init for most tests
+    import wts.config
+
+    config_path = isolate_config_path / wts.config.CONFIG_FILENAME_LOCAL
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(f"worktree_base: {worktree_base_path}\n")
+
+    class WtsCliRunner:
+        """Wrapper around Click's CliRunner with simpler interface."""
+
+        def invoke(self, args: list[str], input: str | None = None):
+            """Invoke CLI command with given arguments."""
+            from click.testing import CliRunner
+            from wts.cli import cli
+
+            runner = CliRunner()
+            return runner.invoke(cli, args, input=input)
+
+    return WtsCliRunner()
+
+
+@pytest.mark.e2e
+def test_create_worktree_empty_repo_fails(
+    tmp_empty_git_repo: Path,
+    empty_repo_cli_runner,
+) -> None:
+    """Test that creating a worktree in an empty repo (no commits) fails with helpful error."""
+    result = empty_repo_cli_runner.invoke(["create", "feature-test"])
+
+    assert result.exit_code != 0, f"Expected non-zero exit code, got {result.exit_code}. Output: {result.output}"
+    assert "no commits" in result.output.lower(), f"Expected 'no commits' in output: {result.output}"
+    assert "initial commit" in result.output.lower(), f"Expected 'initial commit' in output: {result.output}"
+
+
 @pytest.mark.e2e
 def test_create_worktree_basic(
     tmp_git_repo: Path,

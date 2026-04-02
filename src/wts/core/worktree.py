@@ -2,6 +2,7 @@
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -246,22 +247,40 @@ class WorktreeManager:
         """
         self._validate_name(name)
 
-        if not self._is_git_worktree(name):
+        worktree_path = self._get_worktree_path(name)
+        is_registered = self._is_git_worktree(name)
+
+        if not is_registered and not worktree_path.exists():
             raise WorktreeNotFoundError(f"Worktree '{name}' not found")
 
-        worktree_path = self._get_worktree_path(name)
+        if is_registered:
+            cmd = ["git", "worktree", "remove"]
+            if force:
+                cmd.append("--force")
+            cmd.append(str(worktree_path))
 
-        cmd = ["git", "worktree", "remove"]
-        if force:
-            cmd.append("--force")
-        cmd.append(str(worktree_path))
+            run_git_command(
+                cmd,
+                cwd=self.repo_path,
+            )
 
-        run_git_command(
-            cmd,
-            cwd=self.repo_path,
-        )
+        # Check for .xcodeproj before cleanup — Xcode will recreate the directory
+        # after deletion if the project is still open.
+        has_xcodeproj = worktree_path.exists() and any(p.suffix == ".xcodeproj" for p in worktree_path.iterdir())
 
-        if not keep_branch:
+        # Clean up leftover directory if git worktree remove didn't fully delete it
+        # (e.g., when an external program like Xcode holds locks on files)
+        if worktree_path.exists():
+            shutil.rmtree(worktree_path)
+
+        if has_xcodeproj:
+            print(
+                f"Warning: Xcode may recreate '{worktree_path}' after deletion. "
+                "Close the Xcode project to prevent this.",
+                file=sys.stderr,
+            )
+
+        if not keep_branch and self._branch_exists(name):
             run_git_command(
                 ["git", "branch", "-D", name],
                 cwd=self.repo_path,
@@ -554,4 +573,4 @@ class WorktreeManager:
                 )
 
         if cleanup:
-            self.delete(name, keep_branch=False)
+            self.delete(name, keep_branch=False, force=True)

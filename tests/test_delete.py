@@ -221,3 +221,55 @@ def test_delete_force_with_untracked_files(
     assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
     assert "Deleted worktree" in result.output
     assert not worktree_path.exists()
+
+
+@pytest.mark.e2e
+def test_delete_cleans_up_leftover_directory(
+    tmp_git_repo: Path,
+    cli_runner,
+    worktree_base_path: Path,
+) -> None:
+    """Test that delete removes leftover directory when git worktree remove leaves remnants.
+
+    This simulates the scenario where an external program (e.g., Xcode) holds locks
+    on files, causing git worktree remove to unregister the worktree but fail to
+    fully delete the directory.
+    """
+    repo_name = tmp_git_repo.name
+    cli_runner.invoke(["create", "leftover-test"])
+    worktree_path = worktree_base_path / repo_name / "leftover-test"
+    assert worktree_path.exists()
+
+    # Manually unregister worktree from git (simulating partial git worktree remove)
+    subprocess.run(
+        ["git", "worktree", "remove", "--force", str(worktree_path)],
+        cwd=tmp_git_repo,
+        check=True,
+        capture_output=True,
+    )
+
+    # Recreate the directory with leftover files (simulating locked files that
+    # git couldn't delete, like .xcodeproj when Xcode has the project open)
+    worktree_path.mkdir(parents=True)
+    leftover_dir = worktree_path / "Project.xcodeproj"
+    leftover_dir.mkdir()
+    (leftover_dir / "project.pbxproj").write_text("leftover content")
+
+    # Verify git no longer tracks it but directory exists
+    git_result = subprocess.run(
+        ["git", "worktree", "list", "--porcelain"],
+        cwd=tmp_git_repo,
+        capture_output=True,
+        text=True,
+    )
+    assert str(worktree_path) not in git_result.stdout
+
+    # wts list should still show it (it checks filesystem)
+    list_result = cli_runner.invoke(["list"])
+    assert "leftover-test" in list_result.output
+
+    # Delete should clean up the leftover directory
+    result = cli_runner.invoke(["delete", "-f", "leftover-test"])
+
+    assert result.exit_code == 0, f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
+    assert not worktree_path.exists(), f"Leftover directory still exists: {worktree_path}"
